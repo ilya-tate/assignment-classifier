@@ -16,7 +16,7 @@ If npm is unavailable, use `node --env-file-if-exists=.env server/index.js`, `no
 
 ## Enable Snowflake
 
-Copy `.env.example` to `.env`, set `INFERENCE_PROVIDER=snowflake`, your HTTPS Snowflake account URL, personal access token, and an account-supported Cortex model. Restart `npm start`. The token needs the appropriate Cortex REST privileges; confirm account/region access using the [Snowflake setup documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api). Live requests and `npm run eval` in Snowflake mode incur model usage. Credentials stay on the server and must never enter the extension or git.
+Fill in just `SNOWFLAKE_ACCOUNT_URL` and `SNOWFLAKE_TOKEN` in `.env`, then restart `npm start`. A local `.env` has been prepared in this workspace; teammates cloning the repository should first copy `.env.example` to `.env`. The token is a Snowflake Programmatic Access Token (PAT). Inference switches automatically from demo to Snowflake when credentials are supplied. The default model is `snowflake-llama-3.3-70b`; `SNOWFLAKE_MODEL` remains an optional override if your account restricts that model. Your account/token must have Cortex access; see the [Snowflake setup documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api). Live requests and evaluation in Snowflake mode incur model usage. Set `INFERENCE_PROVIDER=mock` when you want an offline demo or evaluation even with credentials configured. `.env` and its local variants are ignored; `.env.example` is tracked. Credentials stay on the server and must never enter the extension or git.
 
 ## Team entry points
 

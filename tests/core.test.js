@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {validateAssignments,validateEstimate,plan} from '../shared/contracts.js';
 import {estimateAssignment} from '../server/inference.js';
 import {createServer} from '../server/index.js';
+import {inferenceConfig,DEFAULT_MODEL} from '../server/config.js';
 const assignment={id:'a',title:'Quiz',course:'Biology',description:'Ten questions',dueAt:'2026-10-04T00:00:00Z',points:10,submissionTypes:['online_quiz']};
 
 test('contract rejects duplicates, invalid dates, excessive payloads and strips extra data',()=>{
@@ -22,6 +23,18 @@ test('mock provider is explicit and unknown providers fail',async()=>{
   await assert.rejects(estimateAssignment(assignment,{env:{INFERENCE_PROVIDER:'other'}}));
 });
 const snowflake={INFERENCE_PROVIDER:'snowflake',SNOWFLAKE_ACCOUNT_URL:'https://example.snowflakecomputing.com',SNOWFLAKE_TOKEN:'test-token',SNOWFLAKE_MODEL:'test-model'};
+test('credentials alone activate Snowflake with a default model; partial credentials fail',async()=>{
+  const env={SNOWFLAKE_ACCOUNT_URL:snowflake.SNOWFLAKE_ACCOUNT_URL,SNOWFLAKE_TOKEN:'test-token'};
+  assert.deepEqual(inferenceConfig(env),{provider:'snowflake',model:DEFAULT_MODEL});
+  assert.equal(inferenceConfig({}).provider,'mock');
+  assert.equal(inferenceConfig({...env,INFERENCE_PROVIDER:'mock'}).provider,'mock');
+  await estimateAssignment(assignment,{env,fetchImpl:async(url,options)=>{
+    assert.equal(JSON.parse(options.body).model,DEFAULT_MODEL);
+    return Response.json({choices:[{message:{content:'{"estimatedMinutes":30,"reason":"Quiz"}'}}]});
+  }});
+  await assert.rejects(estimateAssignment(assignment,{env:{SNOWFLAKE_TOKEN:'test-token'}}),/configuration is incomplete/);
+  await assert.rejects(estimateAssignment(assignment,{env:{SNOWFLAKE_ACCOUNT_URL:env.SNOWFLAKE_ACCOUNT_URL}}),/configuration is incomplete/);
+});
 test('Snowflake adapter sends server auth and validates model output',async()=>{
   let body;
   const fetchImpl=async(url,options)=>{
