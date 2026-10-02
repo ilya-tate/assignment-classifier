@@ -6,24 +6,40 @@ Shared Chrome/Edge Manifest V3 scaffold for Canvas assignment collection, Snowfl
 
 1. Run `npm start` from the repository (mock inference is the default).
 2. Open `chrome://extensions` (or `edge://extensions`), enable Developer mode, choose Load unpacked, and select the `extension/` folder.
-3. Open the extension and click **Load demo**. It sends synthetic assignments to the local server and shows clearly labeled mock estimates.
+3. Open the extension and click **Load demo**. It sends 15 synthetic assignments across 6 courses (`extension/demo-data.js`, dates relative to now) to the local server and shows clearly labeled mock estimates. The set includes past-due work inside and beyond the default 14-day Catch Up window, work due within hours and more than 30 days out, an undated assignment, and sparse descriptions, so you can try the assignment range controls.
 4. Open your signed-in HTTPS Canvas tab, then click **Sync Canvas & estimate**. Keep the popup open while it runs; it shows a live line per course. This sends assignment titles, descriptions, points, submission types, and deadlines to the local API; Snowflake mode forwards relevant text to Snowflake. Up to 100 assignments are supported per sync.
 5. Open http://localhost:8787 to see the last synced assignments as JSON (`course`, `title`, `description`, `dueDate`, `attachments`), grouped into `catchUp` and `upcoming`. It is held in memory only and cleared when the server restarts.
 6. Click **Clear data** to remove cached assignments and saved documents. Reload the extension after code changes.
 
+## End-to-end demo with mock Canvas
+
+To try a real Sync without a Canvas account, run a mock Canvas that serves the same API endpoints the collector scrapes:
+
+1. In a second terminal, run `npm run mock-canvas` (port 8790; `MOCK_CANVAS_PORT` changes it). Keep `npm start` running too.
+2. Open http://localhost:8790. Opening the page signs you in as a demo student.
+3. With that tab active, click **Sync Canvas & estimate** in the extension.
+
+The mock Canvas (`harness/mock-canvas.js`) has 10 courses. Six are current and hold the Load demo assignments plus submitted, graded, pending-review and excused work that should be skipped. Four should be skipped entirely: one past its term end, one concluded, one not on the dashboard, and one stale. It mimics Canvas's session cookie, `while(1);` JSON prefix, Link-header pagination, submissions, dashboard cards, and file endpoints (two assignments link files for `READ_FILES` mode). **Capstone 1** mimics a heavy real capstone: over 200 old graded notes (3 pages if listed unfiltered), long HTML instructions, and large rubrics, with an added 1.2 s per request. `MOCK_CANVAS_DELAY_MS` (default 150) and `MOCK_CANVAS_SLOW_MS` (default 1200) adjust the latency. Use **Sign out** on the mock page to see the signed-out error. The extension accepts plain `http` only for `localhost` and `127.0.0.1`; real Canvas must be HTTPS.
+
 ## What Sync includes
 
 - **Courses:** only current ones. A course is skipped if it is not on your Canvas dashboard, Canvas marks it concluded, its course or term end date has passed, or its latest due date is more than about 6 months old. Courses with no dates at all are kept.
-- **Assignments:** unsubmitted ones only (submitted, graded, pending review, and excused are skipped). Past-due work is kept for 14 days; anything older is skipped. Undated assignments are kept.
+- **Requests:** for each current course, Sync asks Canvas only for open work, using three parallel requests (`bucket=future`, `overdue`, `undated`; no `overdue` when Catch Up is off). Finished past assignments are never downloaded, which keeps courses with long histories fast. Rubrics are still included.
+- **Assignments:** unsubmitted ones only (submitted, graded, pending review, and excused are skipped), within the range set in the popup's **Assignment range** panel:
+  - **Include Catch Up (past due):** on by default. Unchecked, past-due work is skipped.
+  - **Past due up to N days ago:** lower bound for Catch Up (default 14).
+  - **Due within N days:** upper bound for Upcoming (blank = no limit).
+  - Undated assignments are always kept. The range is remembered (Clear data keeps it). Narrowing it filters the current list immediately; widening it needs a new Sync, because Sync only fetches and estimates assignments inside the range.
 - **Popup sections:** **Catch Up** lists past-due work oldest first; **Upcoming** lists the rest soonest first, with undated work last. Start times subtract the estimate plus a 25% buffer from the deadline.
 - **Status line:** after a sync it lists the courses kept and how many courses and assignments were skipped. Skipped course names are logged to the popup console (right-click the popup → Inspect).
 - **Linked files:** not read by default. File handling is planned for the AI step.
 
 ## Settings
 
+The assignment range is set in the popup (see above). These are code-level settings:
+
 | Setting | File | Default | Effect |
 | --- | --- | --- | --- |
-| `OVERDUE_DAYS` | `extension/popup.js` | `14` | How many days past due an unsubmitted assignment stays in Catch Up. `0` drops all past-due work. |
 | `READ_FILES` | `extension/popup.js` | `false` | When `true`, sync reads files linked from descriptions: text/code files (up to 100 KB, 5 per assignment, 8,000 characters) go to the model as `attachments`; documents (PDF, DOCX, PPTX, XLSX, DOC, PPT, RTF, ODT up to 25 MB) are saved once each in the extension's IndexedDB, never sent anywhere, and shown as download links on each card. Skipped files are logged to the popup console. |
 | `STALE_MS` | `extension/canvas.js` | ~6 months | A course whose latest due date is older than this is treated as over. |
 
@@ -33,11 +49,12 @@ Reload the extension after changing any setting.
 
 - **"Cannot reach the local server" / errors on `chrome://extensions`:** the server is not running. Run `npm start` and keep that terminal open. Errors listed on the extensions page persist until you click **Clear all**.
 - **Changes have no effect:** reload the extension on `chrome://extensions`, then refresh the Canvas tab.
+- **Finding bottlenecks:** every sync, including failed or stalled ones, writes a report to `sync-logs/sync-<time>.json` (gitignored; the path is shown in the status line). It contains each phase's duration (reading Canvas, server check, estimating), per-course timing (pages of assignments, time to list them, total), the 15 slowest Canvas API requests, server-side estimate timing (count, average and slowest per assignment), and a timestamped timeline of the progress lines. Reports stay on your machine: they include course names, counts, and the progress lines (which name assignments), but no descriptions or credentials. Set `SYNC_LOG_DIR` to write elsewhere.
 - **Sync seems stuck:** the live progress list shows which course and assignment is being read. Sync fails with a message after 2 minutes without progress, and the list stays visible to show where it stopped.
 - **Old courses still appear:** they are probably on your dashboard (favorited) with no end dates and recent activity. Unfavorite them in Canvas or report the course so detection can be tightened.
-- **"Found N assignments; the server accepts at most 100":** lower `OVERDUE_DAYS`.
+- **"Found N assignments; the server accepts at most 100":** narrow the assignment range (fewer past-due days or a smaller "Due within") and sync again.
 
-No install command is needed. `npm test` runs contract/API/provider tests and Canvas collector tests against a mocked Canvas (filtering, attachments, document dedupe). `npm run eval` runs synthetic effort fixtures and writes ignored `harness/results.json`. Fixture ranges are smoke checks, not measured student completion times or accuracy benchmarks.
+No install command is needed. `npm test` runs contract/API/provider tests, Canvas collector tests against a mocked Canvas (filtering, attachments, document dedupe), end-to-end collector runs against the mock Canvas server over HTTP, and demo data checks. `npm run eval` runs synthetic effort fixtures and writes ignored `harness/results.json`. Fixture ranges are smoke checks, not measured student completion times or accuracy benchmarks.
 
 If npm is unavailable, use `node --env-file-if-exists=.env server/index.js`, `node --test`, and `node --env-file-if-exists=.env harness/evaluate.js` directly.
 
@@ -57,6 +74,7 @@ Copy `.env.example` to `.env` (if you don't have one yet), fill in just `SNOWFLA
 | Local API and JSON view | `server/index.js` |
 | Snowflake adapter and prompt | `server/inference.js`, `server/prompt.js` |
 | Model evaluation | `harness/fixtures.json`, `harness/evaluate.js` |
+| Demo data and mock Canvas | `extension/demo-data.js`, `harness/mock-canvas.js` |
 | Shared agent instructions | `AGENTS.md` |
 
 Read [architecture and contracts](docs/architecture.md) before changing interfaces. The model harness includes a versioned prompt, synthetic evaluation cases, mock/live providers, and shared instructions for coding agents. The current planner subtracts estimated active work plus 25% from the deadline; it does not resolve overlapping assignments or account for your schedule. Live Canvas and Snowflake integration must be verified with your own accounts.

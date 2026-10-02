@@ -34,6 +34,9 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({assignments: message.assignments})
   }, 60000);
+  else if (message.type === 'SYNC_REPORT') work = callServer('/api/sync-report', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({report: message.report})
+  }, 10000);
   else if (message.type === 'FILE_HAS') work = hasCurrentFile(message.key, message.version).then(has => ({has}));
   else if (message.type === 'FILE_SAVE') work = storeDocument(message);
   else if (message.type === 'FILE_LINK') work = linkFile(message.key, message.owner).then(linked => ({linked}));
