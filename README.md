@@ -41,7 +41,7 @@ The mock Canvas (`harness/mock-canvas.js`) has 10 courses. Six are current and h
 
 ## Settings
 
-Most options live in the planner's Advanced options tab (see above). These are the remaining switches:
+Most options live in the planner's Advanced options tab (see above). The Server settings tab beside it lets you save your server URL and access key for the next sync. These are the remaining switches:
 
 | Setting | File | Default | Effect |
 | --- | --- | --- | --- |
@@ -67,7 +67,7 @@ If npm is unavailable, use `node --env-file-if-exists=.env server/index.js`, `no
 
 ## Deploy on DigitalOcean
 
-The server supports a private, single-user App Platform deployment with bearer authentication, explicit extension origins, rate limits, and bounded in-memory retention. Follow [the exact deployment steps](docs/deployment.md). The extension’s **Server settings** page accepts your HTTPS API URL and private access key; Snowflake credentials stay on the server. Localhost remains the default.
+The server supports a private, single-user App Platform deployment with bearer authentication, explicit extension origins, rate limits, and bounded in-memory retention. Follow [the exact deployment steps](docs/deployment.md). The extension’s **Server settings** tab accepts your HTTPS API URL and private access key; Snowflake credentials stay on the server. Localhost remains the default.
 
 ## Enable Snowflake
 

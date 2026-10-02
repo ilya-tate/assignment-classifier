@@ -5,7 +5,6 @@ import {DAY, DEFAULT_SETTINGS, halfYear, resolveWindow, isVisible, collectorOpti
 // Planner settings (date window, filters, priority, Canvas address, developer mode), remembered in chrome.storage.local.
 let settings = structuredClone(DEFAULT_SETTINGS);
 let syncing = false;
-document.querySelector('#server-settings').onclick = () => chrome.runtime.openOptionsPage();
 const status = document.querySelector('#status');
 // The Canvas tab Sync reads: the tab the toolbar icon was clicked on (passed in the URL or by the service worker).
 let sourceTab = null;
@@ -162,7 +161,7 @@ $('#week-next').onclick = () => { weekOffset++; render(shown); };
 $('#week-today').onclick = () => { weekOffset = 0; render(shown); };
 $('#view-week').onclick = () => { settings = {...settings, view: 'week'}; saveSettings(); };
 $('#view-list').onclick = () => { settings = {...settings, view: 'list'}; saveSettings(); };
-// Tabs: Assignments and Advanced options.
+// Tabs: Assignments, Advanced options, and Server settings.
 const tabs = [...document.querySelectorAll('[role=tab]')];
 function selectTab(tab) {
   for (const t of tabs) {
