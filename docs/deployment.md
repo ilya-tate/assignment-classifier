@@ -1,6 +1,6 @@
 # DigitalOcean App Platform (private, single-user)
 
-1. Reload the unpacked extension. Open **Server settings** and copy the displayed `chrome-extension://...` allowed origin.
+1. Reload the unpacked extension. Open the planner’s **Server settings** tab and copy the displayed `chrome-extension://...` allowed origin.
 2. Generate a private access key: `openssl rand -hex 32`. Keep it outside git.
 3. Review, commit and push the deployment code to your GitHub branch. Existing uncommitted work must also be included if required by these files.
 4. DigitalOcean → **Create App** → select that repository and branch. Choose **Web Service**, source directory `/`, no custom build command, run command `npm start`, HTTP port `8080`, HTTP health-check path `/health`, one instance, 512 MiB (increase if monitoring shows pressure). Route `/` to the service. Keep autoscaling off.
@@ -16,7 +16,7 @@
    | `INFERENCE_BATCH_SIZE` | `1` | No |
 
 6. Deploy. Verify `curl -fsS https://YOUR-APP.ondigitalocean.app/health` returns `{"ok":true,"provider":"mock"}`.
-7. In extension **Server settings**, enter the app's HTTPS origin and access key, click **Save**, and allow access to that domain. Reopen the popup and **Load demo**.
+7. In extension **Server settings**, enter the app's HTTPS origin and access key, click **Save**, and allow access to that domain. Switch to **Assignments** and use **Load demo** in the dev toolbar.
 8. For real estimates, set `INFERENCE_PROVIDER=snowflake`, `SNOWFLAKE_ACCOUNT_URL` to your account URL, and encrypted runtime `SNOWFLAKE_TOKEN` to your PAT. Redeploy, then **Sync Canvas & estimate** from your signed-in Canvas tab. Calls incur Snowflake usage.
 
 ## Access, limits, and retention
