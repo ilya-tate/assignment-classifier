@@ -1,3 +1,5 @@
+// Ascending by due time: oldest overdue first, soonest upcoming first, undated last.
+export const byDueDate = (a, b) => (a.dueAt ? Date.parse(a.dueAt) : Infinity) - (b.dueAt ? Date.parse(b.dueAt) : Infinity) || 0;
 export function validateAssignments(value) {
   if (!Array.isArray(value) || value.length > 100) throw new Error('Expected at most 100 assignments');
   const seen = new Set();
