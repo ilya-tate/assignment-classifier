@@ -1,10 +1,13 @@
 import {filesFor, clearFiles} from './files-db.js';
+import {demoAssignments} from './demo-data.js';
 const status = document.querySelector('#status');
 // Live per-course sync progress; cleared when a sync starts and finishes.
 const progressList = document.querySelector('#progress');
 const courseProgress = new Map();
 let lastProgressAt = 0;
 function resetProgress() { courseProgress.clear(); progressList.replaceChildren(); lastProgressAt = Date.now(); }
+// Bottleneck report for the current sync: phase durations and a timestamped progress timeline, saved by the server.
+let phases = [], timeline = [], syncStartedAt = 0;
 const list = document.querySelector('#assignments');
 const buttons = [...document.querySelectorAll('button')];
 const MAX_BATCH = 100;
@@ -104,11 +107,13 @@ function render(data) {
 // Each step gets a label and a deadline so a hang reports where it happened instead of spinning forever.
 async function step(label, ms, work) {
   status.textContent = `${label}…`;
+  const started = Date.now(), phase = {phase: label, ms: 0, ok: false};
+  phases.push(phase);
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Timed out after ${ms / 1000}s while ${label.toLowerCase()}.`)), ms); });
-  try { return await Promise.race([work(), timeout]); }
+  try { const value = await Promise.race([work(), timeout]); phase.ok = true; return value; }
   catch (error) { console.error(`[${label}]`, error); throw error.message.startsWith('Timed out') ? error : new Error(`${label} failed: ${error.message}`); }
-  finally { clearTimeout(timer); }
+  finally { clearTimeout(timer); phase.ms = Date.now() - started; }
 }
 async function run(work) {
   buttons.forEach(b => b.disabled = true); status.className = '';
@@ -129,9 +134,30 @@ async function estimate(assignments) {
   await chrome.storage.local.set({assignments: response.assignments});
   render(response.assignments); status.textContent = `${response.assignments.length} assignments · Estimates are approximate; start times include a 25% buffer and do not resolve overlaps.`;
 }
+async function saveSyncReport(result, error) {
+  const report = {startedAt: new Date(syncStartedAt).toISOString(), totalMs: Date.now() - syncStartedAt, ok: !error, error: error?.message || null,
+    range, readFiles: READ_FILES, phases, canvas: result?.diagnostics || null,
+    counts: result ? {assignments: result.assignments.length, courses: result.courses.length, skipped: {...result.skipped, files: result.skipped.files.length}} : null,
+    timeline};
+  try {
+    const {file} = await ask({type: 'SYNC_REPORT', report});
+    console.info('Sync report saved:', file);
+    return file;
+  } catch (reportError) { console.error('[Sync report]', reportError); return null; }
+}
 document.querySelector('#sync').onclick = () => run(async () => {
+  phases = []; timeline = []; syncStartedAt = Date.now();
+  let result, failure;
+  try { result = await syncCanvas(); }
+  catch (error) { failure = error; }
+  const file = await saveSyncReport(result, failure);
+  if (failure) throw new Error(`${failure.message}${file ? ` (report: ${file})` : ''}`);
+  if (file) status.textContent += ` Report: ${file}.`;
+});
+async function syncCanvas() {
   const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
-  if (!tab?.id || !/^https:/.test(tab.url || '')) throw new Error('Switch to your signed-in Canvas tab (an https:// page) before syncing.');
+  // https Canvas, or the local mock Canvas (npm run mock-canvas) over loopback http.
+  if (!tab?.id || !/^(https:|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/)/.test(tab.url || '')) throw new Error('Switch to your signed-in Canvas tab (an https:// page) before syncing.');
   resetProgress();
   // Large file syncs can legitimately take a while, so fail on 2 minutes without progress rather than a short fixed limit.
   let watchdog;
@@ -153,18 +179,16 @@ document.querySelector('#sync').onclick = () => run(async () => {
   document.querySelector('#range-note').textContent = '';
   const fileSummary = READ_FILES ? ` Read ${attached} attachments, saved ${result.documents.saved} new documents (${result.documents.current} already saved, linked to assignments ${result.documents.links} times), ${result.skipped.files.length} files skipped (see console).` : '';
   status.textContent += ` Courses: ${result.courses.join(', ') || 'none'}. Skipped ${result.skipped.endedCourses} ended courses, ${result.skipped.completed} completed, ${result.skipped.pastDue} ${range.includeCatchUp ? `more than ${range.overdueDays} days past due` : 'past due (Catch Up off)'}${range.daysAhead === null ? '' : `, ${result.skipped.tooFar} due more than ${range.daysAhead} days out`}.` + fileSummary;
-});
-document.querySelector('#demo').onclick = () => run(() => estimate([
-  {id:'demo:1',title:'Research essay',course:'Writing',description:'Write a 1500 word essay with citations.',dueAt:new Date(Date.now()+86400000).toISOString(),points:100,submissionTypes:['online_upload']},
-  {id:'demo:2',title:'Weekly quiz',course:'Biology',description:'Review notes and complete ten questions.',dueAt:new Date(Date.now()+172800000).toISOString(),points:10,submissionTypes:['online_quiz']},
-  {id:'demo:3',title:'Lab report',course:'Chemistry',description:'Write up the titration lab with data tables.',dueAt:new Date(Date.now()-86400000).toISOString(),points:20,submissionTypes:['online_upload']}
-]));
+  return result;
+}
+document.querySelector('#demo').onclick = () => run(() => estimate(demoAssignments()));
 // Clears synced data and saved documents but keeps the chosen range.
 document.querySelector('#clear').onclick = () => run(async () => {await chrome.storage.local.remove('assignments');await clearFiles();render([]);status.textContent='Local data and saved documents cleared.';});
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (sender.id !== chrome.runtime.id) return;
   if (message?.type !== 'CANVAS_PROGRESS' || !status.textContent.startsWith('Reading Canvas')) return;
   lastProgressAt = Date.now();
+  timeline.push({atMs: lastProgressAt - syncStartedAt, course: message.course || null, text: message.text});
   if (!message.course) { status.textContent = `Reading Canvas… ${message.text}`; return; }
   courseProgress.set(message.course, message.text);
   progressList.replaceChildren(...[...courseProgress].map(([course, text]) => {

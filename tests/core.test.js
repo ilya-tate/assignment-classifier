@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import {mkdtemp,readdir,readFile,rm} from 'node:fs/promises';
 import {validateAssignments,validateEstimate,plan} from '../shared/contracts.js';
 import {estimateAssignment} from '../server/inference.js';
 import {createServer,summarize} from '../server/index.js';
@@ -94,6 +97,25 @@ test('assignment view splits Catch Up from Upcoming with the public fields',asyn
   assert.equal(page.catchUp.length+page.upcoming.length,1);assert.ok(page.syncedAt);
   const rebound=await new Promise(resolve=>http.get(`${base}/`,{headers:{Host:'evil.example'}},resolve));
   assert.equal(rebound.statusCode,403);rebound.resume();
+});
+test('sync reports are written one file per sync with server estimate timing',async(t)=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'sync-logs-'));
+  t.after(()=>rm(dir,{recursive:true,force:true}));
+  const server=createServer({env:{SYNC_LOG_DIR:dir}});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  const post=(url,value)=>fetch(`${base}${url}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
+  const startedAt=new Date(Date.now()-1000).toISOString();
+  await post('/api/estimate',{assignments:[assignment,{...assignment,id:'b'}]});
+  const first=await (await post('/api/sync-report',{report:{startedAt,phases:[{phase:'Reading Canvas',ms:1234,ok:true}]}})).json();
+  await post('/api/sync-report',{report:{startedAt:new Date(Date.now()+1000).toISOString()}});
+  const files=(await readdir(dir)).sort();
+  assert.equal(files.length,2);assert.match(files[0],/^sync-.*\.json$/);assert.ok(first.file.endsWith('.json'));
+  const saved=await Promise.all(files.map(async f=>JSON.parse(await readFile(path.join(dir,f),'utf8'))));
+  const withTiming=saved.find(r=>r.phases);
+  assert.equal(withTiming.server.estimate.count,2);assert.equal(withTiming.phases[0].ms,1234);
+  assert.equal(saved.find(r=>!r.phases).server.estimate,null);
+  assert.equal((await post('/api/sync-report',{report:[1]})).status,400);
 });
 test('HTTP API surfaces inference failures without exposing secrets',async(t)=>{
   const server=createServer({estimate:async()=>{throw new Error('sensitive upstream detail');}});
