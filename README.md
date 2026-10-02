@@ -8,7 +8,8 @@ Shared Chrome/Edge Manifest V3 scaffold for Canvas assignment collection, Snowfl
 2. Open `chrome://extensions` (or `edge://extensions`), enable Developer mode, choose Load unpacked, and select the `extension/` folder.
 3. Open the extension and click **Load demo**. It sends synthetic assignments to the local server and shows clearly labeled mock estimates.
 4. Open your signed-in HTTPS Canvas tab, then click **Sync Canvas & estimate**. This sends assignment titles, descriptions, points, submission types, and deadlines to the local API; Snowflake mode forwards relevant text to Snowflake. Up to 100 pending assignments are supported per request.
-5. Click **Clear data** to remove cached assignments. Reload the extension after code changes.
+5. Open http://localhost:8787 to see the last synced assignments as JSON, grouped into Catch Up (past due) and Upcoming. It is held in memory only and cleared when the server restarts.
+6. Click **Clear data** to remove cached assignments. Reload the extension after code changes.
 
 No install command is needed. `npm test` runs contract/API/provider tests. `npm run eval` runs synthetic effort fixtures and writes ignored `harness/results.json`. Fixture ranges are smoke checks, not measured student completion times or accuracy benchmarks.
 
