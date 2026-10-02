@@ -41,7 +41,7 @@ test('truncation, malformed HTTP bodies, upstream errors and cancellation are di
 test('batch bounds concurrency, retains input order and writes safe per-assignment diagnostics',async(t)=>{
   const reportDir=await directory(t);let active=0,max=0;
   const estimate=async(assignment)=>{active++;max=Math.max(active,max);await new Promise(r=>setTimeout(r,10));active--;return {...result,estimatedMinutes:Number(assignment.id),provider:'mock'};};
-  const job=startBatch(Array.from({length:46},(_,i)=>({...a,id:String(i+5)})),{env:{},estimate,reportDir});
+  const job=startBatch(Array.from({length:46},(_,i)=>({...a,id:String(i+5)})),{env:{INFERENCE_BATCH_SIZE:'1'},estimate,reportDir});
   await job.done;
   assert.equal(max,3);assert.equal(job.report.count,46);assert.equal(job.report.status,'complete');
   assert.deepEqual(job.results.map(a=>a.estimatedMinutes),Array.from({length:46},(_,i)=>i+5));
@@ -55,7 +55,7 @@ test('failure cancels in-flight requests, stops queued work and preserves the fa
     if(assignment.id==='fail') {await new Promise(r=>setTimeout(r,5));throw new InferenceError('MODEL_JSON_INVALID');}
     await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>{aborted++;reject(new Error('cancel'));},{once:true}));
   };
-  const job=startBatch([{...a,id:'fail'},...Array(9).fill(a)],{env:{},estimate,reportDir});
+  const job=startBatch([{...a,id:'fail'},...Array(9).fill(a)],{env:{INFERENCE_BATCH_SIZE:'1'},estimate,reportDir});
   await job.done;
   assert.equal(started,3);assert.equal(aborted,2);assert.equal(job.report.status,'failed');
   assert.equal(job.report.items[0].errorCode,'MODEL_JSON_INVALID');assert.match(job.error,/Assignment 1/);
@@ -85,7 +85,7 @@ test('saved scrape reports omit arbitrary fields, names, timeline text and query
 test('batch deadline aborts the provider and saves a terminal cancellation event',async(t)=>{
   const reportDir=await directory(t);let aborted=false;
   const estimate=async(assignment,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>{aborted=true;reject(new Error('aborted'));},{once:true}));
-  const job=startBatch([a],{env:{},estimate,reportDir,deadlineMs:10});await job.done;
+  const job=startBatch([a],{env:{INFERENCE_BATCH_SIZE:'1'},estimate,reportDir,deadlineMs:10});await job.done;
   assert.equal(aborted,true);assert.equal(job.report.status,'cancelled');assert.equal(job.report.count,0);
   assert.match(await readFile(path.join(reportDir,(await readdir(reportDir))[0]),'utf8'),/batch_finished/);
 });

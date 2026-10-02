@@ -15,7 +15,7 @@ const response=rows=>Response.json({usage:{prompt_tokens:100,completion_tokens:2
 test('group configuration and byte packing handle tails, long text, Unicode and empty input',()=>{
   for(const n of [1,5,10]) {assert.equal(batchSizeFromEnv({INFERENCE_BATCH_SIZE:String(n)}),n);assert.equal(packGroups(Array(46).fill(a),n).length,Math.ceil(46/n));}
   for(const value of ['0','2','100','5junk','']) assert.throws(()=>batchSizeFromEnv({INFERENCE_BATCH_SIZE:value}));
-  assert.equal(batchSizeFromEnv(),1);assert.deepEqual(packGroups([],10),[]);
+  assert.equal(batchSizeFromEnv(),5);assert.deepEqual(packGroups([],10),[]);
   const long={...a,description:'漢'.repeat(6000)};
   assert.deepEqual(packGroups([a,long,a],10).map(g=>g.length),[1,1,1]);
 });

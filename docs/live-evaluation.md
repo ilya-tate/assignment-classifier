@@ -34,7 +34,7 @@ Raw model output was not stored, so a schema failure cannot distinguish all sema
 
 ## Decision and remaining evidence
 
-Keep the default at 1 for now. Size 5 was fastest in the ordinary run and is a useful optimization candidate, but neither grouped mode maintained singleton consistency. Size 10 used the fewest tokens and was more consistent than 5 in this ordinary run, yet it was slower; one run cannot establish a reliable ranking. These results do not establish that singleton estimates are more accurate.
+The evaluation recommendation was to keep the default at 1. For the demo, the user subsequently chose a default of 5; this changes the demo configuration, not the evaluation findings. Size 5 was fastest in the ordinary run and is a useful optimization candidate, but neither grouped mode maintained singleton consistency. Size 10 used the fewest tokens and was more consistent than 5 in this ordinary run, yet it was slower; one run cannot establish a reliable ranking. These results do not establish that singleton estimates are more accurate.
 
 Actual ±25% prediction accuracy is unavailable: the user confirmed there are no recorded active completion times. The evaluator explicitly records this missing evidence rather than deriving accuracy from fixture ranges, model self-confidence or singleton agreement. Future labeled evaluation should compare `abs(predicted - actual) / actual <= 0.25` on held-out tasks, counting failed predictions as misses and reporting results by task type. `harness/batch-evaluation.js` includes tested metrics for positive actual-minute labels, but no labels were invented for this run.
 

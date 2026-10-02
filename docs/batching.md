@@ -1,6 +1,6 @@
 # Inference batching
 
-Set `INFERENCE_BATCH_SIZE=1`, `5`, or `10` in `.env` and restart `npm start`. Default is 1; all modes use the same open-weight model selected by `SNOWFLAKE_MODEL`. Both the synchronous estimate API and polled job API use this setting. The extension needs no change, and progress still counts completed assignments.
+Set `INFERENCE_BATCH_SIZE=1`, `5`, or `10` in `.env` and restart `npm start`. The demo default is 5; all modes use the same open-weight model selected by `SNOWFLAKE_MODEL`. Both the synchronous estimate API and polled job API use this setting. The extension needs no change, and progress still counts completed assignments.
 
 Three workers process groups. Each group has at most the selected item count and a conservative 16,000-byte serialized input budget, including descriptions and attachments. UTF-8 bytes bound text tokens conservatively without a tokenizer; this is a packing budget, not an exact token count or a model context guarantee. A larger individual assignment is sent on its own and remains subject to provider limits. The output cap is 512 tokens times the number of items, up to 5,120. A final singleton uses the original single-item prompt.
 
