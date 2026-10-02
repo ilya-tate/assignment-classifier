@@ -2,3 +2,4 @@ body{font:14px system-ui;background:#f4f6fb;color:#172033;width:440px;padding:16
 #status.error{color:#bd4629;font-weight:600}
 .files{margin:0 0 6px;color:#536078;font-size:13px}
 #progress{margin:0 0 8px;padding-left:18px;font-size:12px;color:#536078;overflow-wrap:anywhere}#progress:empty{display:none}
+#range{border:1px solid #ccd3df;border-radius:8px;margin:12px 0 0;padding:8px 12px;display:grid;gap:6px}#range legend{font-weight:600;padding:0 4px}#range input[type=number]{width:4.5em;padding:3px}.hint{margin:0;font-size:12px;color:#536078}.hint:empty{display:none}
