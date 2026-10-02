@@ -14,16 +14,21 @@ Shared Chrome/Edge Manifest V3 scaffold for Canvas assignment collection, Snowfl
 ## What Sync includes
 
 - **Courses:** only current ones. A course is skipped if it is not on your Canvas dashboard, Canvas marks it concluded, its course or term end date has passed, or its latest due date is more than about 6 months old. Courses with no dates at all are kept.
-- **Assignments:** unsubmitted ones only (submitted, graded, pending review, and excused are skipped). Past-due work is kept for 14 days; anything older is skipped. Undated assignments are kept.
+- **Assignments:** unsubmitted ones only (submitted, graded, pending review, and excused are skipped), within the range set in the popup's **Assignment range** panel:
+  - **Include Catch Up (past due):** on by default. Unchecked, past-due work is skipped.
+  - **Past due up to N days ago:** lower bound for Catch Up (default 14).
+  - **Due within N days:** upper bound for Upcoming (blank = no limit).
+  - Undated assignments are always kept. The range is remembered (Clear data keeps it). Narrowing it filters the current list immediately; widening it needs a new Sync, because Sync only fetches and estimates assignments inside the range.
 - **Popup sections:** **Catch Up** lists past-due work oldest first; **Upcoming** lists the rest soonest first, with undated work last. Start times subtract the estimate plus a 25% buffer from the deadline.
 - **Status line:** after a sync it lists the courses kept and how many courses and assignments were skipped. Skipped course names are logged to the popup console (right-click the popup → Inspect).
 - **Linked files:** not read by default. File handling is planned for the AI step.
 
 ## Settings
 
+The assignment range is set in the popup (see above). These are code-level settings:
+
 | Setting | File | Default | Effect |
 | --- | --- | --- | --- |
-| `OVERDUE_DAYS` | `extension/popup.js` | `14` | How many days past due an unsubmitted assignment stays in Catch Up. `0` drops all past-due work. |
 | `READ_FILES` | `extension/popup.js` | `false` | When `true`, sync reads files linked from descriptions: text/code files (up to 100 KB, 5 per assignment, 8,000 characters) go to the model as `attachments`; documents (PDF, DOCX, PPTX, XLSX, DOC, PPT, RTF, ODT up to 25 MB) are saved once each in the extension's IndexedDB, never sent anywhere, and shown as download links on each card. Skipped files are logged to the popup console. |
 | `STALE_MS` | `extension/canvas.js` | ~6 months | A course whose latest due date is older than this is treated as over. |
 
@@ -35,7 +40,7 @@ Reload the extension after changing any setting.
 - **Changes have no effect:** reload the extension on `chrome://extensions`, then refresh the Canvas tab.
 - **Sync seems stuck:** the live progress list shows which course and assignment is being read. Sync fails with a message after 2 minutes without progress, and the list stays visible to show where it stopped.
 - **Old courses still appear:** they are probably on your dashboard (favorited) with no end dates and recent activity. Unfavorite them in Canvas or report the course so detection can be tightened.
-- **"Found N assignments; the server accepts at most 100":** lower `OVERDUE_DAYS`.
+- **"Found N assignments; the server accepts at most 100":** narrow the assignment range (fewer past-due days or a smaller "Due within") and sync again.
 
 No install command is needed. `npm test` runs contract/API/provider tests and Canvas collector tests against a mocked Canvas (filtering, attachments, document dedupe). `npm run eval` runs synthetic effort fixtures and writes ignored `harness/results.json`. Fixture ranges are smoke checks, not measured student completion times or accuracy benchmarks.
 

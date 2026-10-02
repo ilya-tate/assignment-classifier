@@ -1,8 +1,10 @@
 // Executed only after a user clicks Sync on their active Canvas tab.
 // overdueDays: how many days past due an unsubmitted assignment is still kept (0 = drop all past-due work).
+// daysAhead: how many days ahead to include (null = no upper limit). Undated assignments are always kept.
 // readFiles: also read/save files linked from descriptions (off by default; file handling is planned for the AI step).
-async function collectCanvasAssignments({overdueDays = 0, readFiles = false} = {}) {
+async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, readFiles = false} = {}) {
   const cutoff = Date.now() - overdueDays * 86400000;
+  const horizon = daysAhead === null ? Infinity : Date.now() + daysAhead * 86400000;
   const DONE_STATES = new Set(['submitted', 'graded', 'pending_review']);
   const isCompleted = s => Boolean(s && (DONE_STATES.has(s.workflow_state) || s.submitted_at || s.excused));
   const text = html => new DOMParser().parseFromString(html || '', 'text/html').body.textContent.trim();
@@ -168,7 +170,7 @@ async function collectCanvasAssignments({overdueDays = 0, readFiles = false} = {
     const courses = available.filter(c => !isOver(c) && (!dashboard || dashboard.has(String(c.id))));
     const assignments = [];
     const documents = {saved: 0, current: 0, links: 0};
-    const skipped = {completed: 0, pastDue: 0, files: [], endedCourses: available.length - courses.length, endedCourseNames: available.filter(c => !courses.includes(c)).map(c => c.name)};
+    const skipped = {completed: 0, pastDue: 0, tooFar: 0, files: [], endedCourses: available.length - courses.length, endedCourseNames: available.filter(c => !courses.includes(c)).map(c => c.name)};
     const kept = [];
     // A course whose latest due date is over a semester (~6 months) old is treated as over even if Canvas says otherwise.
     const STALE_MS = 182 * 86400000;
@@ -195,6 +197,7 @@ async function collectCanvasAssignments({overdueDays = 0, readFiles = false} = {
           if (isCompleted(a.submission)) { skipped.completed++; continue; }
           // Undated assignments are kept; the planner shows them without a start time.
           if (a.due_at && Date.parse(a.due_at) < cutoff) { skipped.pastDue++; continue; }
+          if (a.due_at && Date.parse(a.due_at) > horizon) { skipped.tooFar++; continue; }
           const id = `${location.host}:${course.id}:${a.id}`;
           report(`assignment ${index + 1}/${rows.length} · ${a.name}`);
           assignments.push({id, title: a.name,

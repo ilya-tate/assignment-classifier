@@ -77,3 +77,16 @@ test('sync skips linked files entirely unless file reading is enabled', async ()
   assert.equal(downloads, 0); assert.equal(store.size, 0);
   assert.equal(requested.some(path => path.includes('/files/')), false);
 });
+test('assignment range keeps past-due work within overdueDays and upcoming work within daysAhead', async () => {
+  const day = 86400000, at = offset => new Date(Date.now() + offset * day).toISOString();
+  const rows = [{id: 1, name: 'old', due_at: at(-20)}, {id: 2, name: 'recent', due_at: at(-3)}, {id: 3, name: 'soon', due_at: at(5)},
+    {id: 4, name: 'far', due_at: at(40)}, {id: 5, name: 'undated', due_at: null}];
+  const saved = assignments.splice(0, assignments.length, ...rows);
+  try {
+    const titles = async options => (await collect(new Map(), options)).result.assignments.map(a => a.title);
+    assert.deepEqual(await titles({overdueDays: 7, daysAhead: 30}), ['recent', 'soon', 'undated']);
+    assert.deepEqual(await titles({overdueDays: 0, daysAhead: null}), ['soon', 'far', 'undated']);
+    const {result} = await collect(new Map(), {overdueDays: 7, daysAhead: 30});
+    assert.deepEqual({pastDue: result.skipped.pastDue, tooFar: result.skipped.tooFar}, {pastDue: 1, tooFar: 1});
+  } finally { assignments.splice(0, assignments.length, ...saved); }
+});
