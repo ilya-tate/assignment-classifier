@@ -43,7 +43,7 @@ If npm is unavailable, use `node --env-file-if-exists=.env server/index.js`, `no
 
 ## Enable Snowflake
 
-Copy `.env.example` to `.env` (if you don't have one yet), fill in just `SNOWFLAKE_ACCOUNT_URL` and `SNOWFLAKE_TOKEN`, then restart `npm start`. Without `.env`, the server runs in mock mode. The token is a Snowflake Programmatic Access Token (PAT). Inference switches automatically from demo to Snowflake when credentials are supplied. The default model is `snowflake-llama-3.3-70b`; `SNOWFLAKE_MODEL` remains an optional override if your account restricts that model. Your account/token must have Cortex access; see the [Snowflake setup documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api). Live requests and evaluation in Snowflake mode incur model usage. Set `INFERENCE_PROVIDER=mock` when you want an offline demo or evaluation even with credentials configured. `.env` and its local variants are ignored; `.env.example` is tracked. Credentials stay on the server and must never enter the extension or git.
+Copy `.env.example` to `.env` (if you don't have one yet), fill in just `SNOWFLAKE_ACCOUNT_URL` and `SNOWFLAKE_TOKEN`, then restart `npm start`. Without `.env`, the server runs in mock mode. The token is a Snowflake Programmatic Access Token (PAT). Inference switches automatically from demo to Snowflake when credentials are supplied. The default model is `llama3.1-8b`; `SNOWFLAKE_MODEL` remains an optional override if your account restricts that model. Your account/token must have Cortex access; see the [Snowflake setup documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api). Live requests and evaluation in Snowflake mode incur model usage. Set `INFERENCE_PROVIDER=mock` when you want an offline demo or evaluation even with credentials configured. `.env` and its local variants are ignored; `.env.example` is tracked. Credentials stay on the server and must never enter the extension or git.
 
 ## Team entry points
 
@@ -60,3 +60,5 @@ Copy `.env.example` to `.env` (if you don't have one yet), fill in just `SNOWFLA
 | Shared agent instructions | `AGENTS.md` |
 
 Read [architecture and contracts](docs/architecture.md) before changing interfaces. The model harness includes a versioned prompt, synthetic evaluation cases, mock/live providers, and shared instructions for coding agents. The current planner subtracts estimated active work plus 25% from the deadline; it does not resolve overlapping assignments or account for your schedule. Live Canvas and Snowflake integration must be verified with your own accounts.
+
+For model costs and the proposed ±25% accuracy validation plan, see [model selection](docs/model-selection.md).
