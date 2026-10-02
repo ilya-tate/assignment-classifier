@@ -12,10 +12,10 @@
   </div>
   <div class="actions"><button id="sync" class="primary">Sync with Canvas</button></div>
 </header>
-<button id="server-settings" type="button">Server settings</button>
 <nav class="tabs" role="tablist" aria-label="Planner views">
   <button role="tab" id="tab-assignments" aria-controls="panel-assignments" aria-selected="true">Assignments</button>
   <button role="tab" id="tab-advanced" aria-controls="panel-advanced" aria-selected="false" tabindex="-1">Advanced options</button>
+  <button role="tab" id="tab-server" aria-controls="panel-server" aria-selected="false" tabindex="-1">Server settings</button>
 </nav>
 </div>
 
@@ -119,4 +119,22 @@
   </div>
 </section>
 
+<section id="panel-server" role="tabpanel" aria-labelledby="tab-server" hidden>
+  <form id="settings" class="options server-options">
+    <fieldset>
+      <legend>Server connection</legend>
+      <p class="hint">Use your private server access key. Snowflake credentials belong only on the server.</p>
+      <label for="url">Server URL</label>
+      <input id="url" type="url" required value="http://localhost:8787">
+      <label for="key">Access key</label>
+      <input id="key" type="password" autocomplete="off">
+      <div><button type="submit" class="primary">Save</button></div>
+      <p id="server-settings-status" role="status"></p>
+      <p id="origin" class="hint"></p>
+      <p class="hint">The key is stored locally in this browser profile. Hosted assignment data expires after 15 minutes; browser data remains until Clear data.</p>
+    </fieldset>
+  </form>
+</section>
+
+<script type="module" src="options.js"></script>
 <script src="canvas.js"></script><script type="module" src="popup.js"></script></body></html>
