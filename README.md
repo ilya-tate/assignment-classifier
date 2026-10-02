@@ -94,7 +94,7 @@ For model costs and the proposed ±25% accuracy validation plan, see [model sele
 
 ## Compare inference batch sizes
 
-Set `INFERENCE_BATCH_SIZE=1`, `5`, or `10` in `.env`, then restart the server. Default is 1. Three groups run concurrently; large inputs split into smaller groups. Progress still counts assignments. Batch responses are matched by local IDs, validated, and missing or invalid items get at most one single-item retry. HTTP/network failures are not retried. Logs include batch size, actual group count, request count, retries and token totals.
+Set `INFERENCE_BATCH_SIZE=1`, `5`, or `10` in `.env`, then restart the server. The demo default is 5. Three groups run concurrently; large inputs split into smaller groups. Progress still counts assignments. Batch responses are matched by local IDs, validated, and missing or invalid items get at most one single-item retry. HTTP/network failures are not retried. Logs include batch size, actual group count, request count, retries and token totals.
 
 Run `npm run eval:batch` for an offline, three-repeat comparison of all modes on 46 synthetic assignments. It writes ignored `harness/batch-results.json`. This simulates request overhead and token counts; it cannot measure real model accuracy, reliability, latency or cost. `INFERENCE_PROVIDER=mock npm run eval` runs the original smoke evaluation without paid calls.
 

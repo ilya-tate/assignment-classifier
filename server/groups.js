@@ -1,7 +1,7 @@
 import {assignmentPayload} from './inference.js';
 
 export function batchSizeFromEnv(env={}) {
-  const value=String(env.INFERENCE_BATCH_SIZE ?? '1');
+  const value=String(env.INFERENCE_BATCH_SIZE ?? '5');
   if(!['1','5','10'].includes(value)) throw new Error('INFERENCE_BATCH_SIZE must be 1, 5, or 10');
   return Number(value);
 }
