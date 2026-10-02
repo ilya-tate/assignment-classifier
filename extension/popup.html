@@ -1,11 +1,121 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Assignment Planner</title><link rel="stylesheet" href="popup.css"></head>
-<body><h1>Assignment Planner</h1><p>Sync from your signed-in Canvas tab. Assignment titles, descriptions, and deadlines will be sent to your inference server.</p>
-<div class="actions"><button id="sync">Sync Canvas & estimate</button><button id="demo">Load demo</button><button id="clear">Clear data</button></div>
-<fieldset id="range"><legend>Assignment range</legend>
-<label><input type="checkbox" id="include-catch-up"> Include Catch Up (past due)</label>
-<label>Past due up to <input type="number" id="overdue-days" min="1" max="365" step="1" inputmode="numeric"> days ago</label>
-<label>Due within <input type="number" id="days-ahead" min="1" max="365" step="1" inputmode="numeric" placeholder="any"> days</label>
-<p id="range-note" class="hint"></p></fieldset>
-<p id="status" role="status"></p><ul id="progress" aria-label="Sync progress"></ul><main id="assignments"></main>
+<body>
+<div class="sticky-head">
+<header class="topbar">
+  <div class="brand"><h1>Assignment Planner</h1><p id="source" class="source"></p></div>
+  <div class="sync-area">
+    <div id="loadbar" class="loadbar idle" role="progressbar" aria-labelledby="loadbar-label" aria-valuemin="0" aria-valuemax="100">
+      <span id="loadbar-fill" class="loadbar-fill"></span><span id="loadbar-label" class="loadbar-label"></span>
+    </div>
+    <div class="status-slot"><p id="status" role="status"></p></div>
+  </div>
+  <div class="actions"><button id="sync" class="primary">Sync with Canvas</button></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="Planner views">
+  <button role="tab" id="tab-assignments" aria-controls="panel-assignments" aria-selected="true">Assignments</button>
+  <button role="tab" id="tab-advanced" aria-controls="panel-advanced" aria-selected="false" tabindex="-1">Advanced options</button>
+</nav>
+</div>
+
+<section id="dev-tools" class="dev-tools" aria-label="Developer tools" hidden>
+  <span class="dev-badge">Dev</span>
+  <button id="demo" class="small">Load demo</button>
+  <button id="clear" class="small">Clear data</button>
+  <label class="check small-text"><input type="checkbox" id="read-files"> Read linked files during sync</label>
+  <span id="server-info" class="small-text"></span>
+  <a href="http://localhost:8787/" target="_blank" rel="noopener" class="small-text">Synced JSON</a>
+  <div class="dev-log"><p id="last-report" class="small-text"></p><p id="dev-status" class="small-text"></p><ul id="progress" aria-label="Sync progress by course"></ul></div>
+</section>
+
+
+
+<section id="panel-assignments" role="tabpanel" aria-labelledby="tab-assignments">
+  <div class="list-bar">
+    <div><p id="window-summary" class="small-text"></p><p id="priority-summary" class="priority-summary"></p></div>
+    <div class="view-switch" role="group" aria-label="View">
+      <button type="button" id="view-week" class="small" aria-pressed="true">Week</button><button type="button" id="view-list" class="small" aria-pressed="false">List</button>
+    </div>
+  </div>
+  <div id="week-view">
+    <div class="week-nav">
+      <button type="button" id="week-prev" class="small" aria-label="Previous week">‹</button>
+      <button type="button" id="week-next" class="small" aria-label="Next week">›</button>
+      <button type="button" id="week-today" class="quiet small">This week</button>
+      <h2 id="week-label" class="week-label"></h2>
+    </div>
+    <div class="week-scroll"><div id="week" class="week" role="grid" aria-labelledby="week-label"></div></div>
+    <div id="week-detail" class="week-detail"></div>
+  </div>
+  <div id="list-view" hidden>
+    <div class="list-tools"><button type="button" id="expand-all" class="quiet small">Expand all</button><button type="button" id="collapse-all" class="quiet small">Collapse all</button></div>
+    <main id="assignments"></main>
+  </div>
+</section>
+
+<section id="panel-advanced" role="tabpanel" aria-labelledby="tab-advanced" hidden>
+  <div class="options">
+    <fieldset>
+      <legend>Date range</legend>
+      <label class="radio"><input type="radio" name="preset" id="preset-half" value="half-year"> <span>This half of the year <span id="half-label" class="small-text"></span></span></label>
+      <label class="radio"><input type="radio" name="preset" id="preset-custom" value="custom"> <span>Custom dates</span></label>
+      <div class="dates">
+        <label>From <input type="date" id="range-from"></label>
+        <label>To <input type="date" id="range-to"></label>
+      </div>
+      <p class="hint">The year is split into January–May and June–December. Late assignments count from the start of the range.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Include</legend>
+      <label class="check"><input type="checkbox" id="include-late"> Late assignments (past due, not submitted), shown under Catch Up</label>
+      <label class="check"><input type="checkbox" id="include-undated"> Assignments with no due date</label>
+      <label class="check"><input type="checkbox" id="hide-zero"> Hide assignments worth 0 points (optional or ungraded)</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Priority</legend>
+      <label for="urgent-days">Flag as <b>Due soon</b> when due</label>
+      <select id="urgent-days">
+        <option value="0">Today</option>
+        <option value="1">Today or tomorrow</option>
+        <option value="2">Within 3 days</option>
+        <option value="-1">Off</option>
+      </select>
+      <p class="hint">Late assignments are always flagged <b>Late</b>. Both flags are counted at the top of the list.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Week view</legend>
+      <label for="daily-hours">Work per assignment per day</label>
+      <select id="daily-hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select>
+      <label for="week-start">Week starts on</label>
+      <select id="week-start"><option value="1">Monday</option><option value="0">Sunday</option></select>
+      <p class="hint">Fewer hours per day spreads each assignment across more days.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Courses</legend>
+      <div id="course-filters" class="course-filters"><p class="hint">Courses appear here after a sync.</p></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Canvas</legend>
+      <label for="canvas-url">Canvas address</label>
+      <input type="url" id="canvas-url" placeholder="https://canvas.yourschool.edu" autocomplete="url">
+      <p class="hint">Filled in automatically after your first sync. When no Canvas tab is open, Sync opens this address in a background tab, reads it, and closes it. The first time, Chrome asks to allow access to this site.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Developer</legend>
+      <label class="check"><input type="checkbox" id="dev-mode"> Developer mode</label>
+      <p class="hint">Shows a toolbar with Load demo, Clear data, server status, the synced JSON view, the latest sync report, and linked-file reading.</p>
+    </fieldset>
+  </div>
+  <div class="options-footer">
+    <p id="options-note" class="hint">Changes apply to the list right away. Widening the date range or turning late assignments on needs a new Sync.</p>
+    <button type="button" id="reset-options" class="quiet small">Reset to defaults</button>
+  </div>
+</section>
+
 <script src="canvas.js"></script><script type="module" src="popup.js"></script></body></html>

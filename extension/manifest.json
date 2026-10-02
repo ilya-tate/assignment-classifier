@@ -3,8 +3,9 @@
   "name": "Assignment Planner",
   "version": "0.1.0",
   "description": "Collect Canvas assignments and plan when to start them.",
-  "permissions": ["activeTab", "scripting", "storage", "unlimitedStorage"],
+  "permissions": ["activeTab", "scripting", "storage", "unlimitedStorage", "declarativeContent"],
   "host_permissions": ["http://localhost:8787/*"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "background": {"service_worker": "background.js", "type": "module"},
-  "action": {"default_popup": "popup.html"}
+  "action": {"default_title": "Open Assignment Planner"}
 }

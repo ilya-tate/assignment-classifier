@@ -249,6 +249,6 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
     await Promise.all(Array.from({length: Math.min(4, courses.length)}, worker));
     const diagnostics = {totalMs: Date.now() - syncStarted, requestCount: requests.length, courses: courseStats,
       slowestRequests: [...requests].sort((a, b) => b.ms - a.ms).slice(0, 15)};
-    return {ok: true, assignments, skipped, documents, courses: kept, diagnostics};
+    return {ok: true, origin: location.origin, assignments, skipped, documents, courses: kept, diagnostics};
   } catch (error) { return {ok: false, error: error.message}; }
 }
