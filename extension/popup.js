@@ -137,7 +137,7 @@ function renderCourseFilters(data) {
     });
     const count = data.filter(a => a.course === course).length;
     label.append(input, ` ${course} `, el('span', 'small-text', `(${count})`));
-    label.style.setProperty('--course-hue', courseHue(course));
+    label.style.setProperty('--course', courseColor(course));
     return label;
   }));
 }
@@ -209,7 +209,10 @@ function effort(minutes) {
   return `${hours} h`;
 }
 // Stable color per course name so the same course looks the same everywhere.
-const courseHue = name => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+// Course colors from Cobalt Next's syntax palette (themes/CobaltNext.json). Its red and yellow are left out
+// because they mark late and due-soon work.
+const COURSE_COLORS = ['#5A9BCF', '#99C794', '#C5A5C5', '#EB9A6D', '#BB80B3', '#AB7967', '#CDD3DE'];
+const courseColor = name => COURSE_COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7) % COURSE_COLORS.length];
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -229,7 +232,7 @@ function card(a, overdue, {daysOnly = false} = {}) {
   card.addEventListener('toggle', () => { card.open ? expanded.add(a.id) : expanded.delete(a.id); });
   if (overdue) card.classList.add('late');
   else if (a.startAt && new Date(a.startAt) < new Date()) card.classList.add('behind');
-  card.style.setProperty('--course-hue', courseHue(a.course));
+  card.style.setProperty('--course', courseColor(a.course));
 
   const summary = el('summary');
   const top = el('div', 'card-top');
@@ -316,7 +319,7 @@ function renderWeek(visible, now) {
     const bar = el('button', `bar${flag ? ` bar-${flag}` : ''}${span.behind ? ' bar-behind' : ''}${continuesBefore ? ' cont-before' : ''}${continuesAfter ? ' cont-after' : ''}${a.id === selectedId ? ' selected' : ''}`);
     bar.type = 'button';
     for (const [name, value] of Object.entries({'--s': startCol + 1, '--e': endCol + 2, '--lane': lane + 2})) bar.style.setProperty(name, String(value));
-    bar.style.setProperty('--course-hue', courseHue(a.course));
+    bar.style.setProperty('--course', courseColor(a.course));
     // Bars show only course and title; late and due-soon work is marked by color. Details open below on click.
     bar.title = `${a.course}: ${a.title}`;
     if (flag) bar.setAttribute('aria-label', `${a.course}: ${a.title} (${flag === 'late' ? 'late' : 'due soon'})`);
