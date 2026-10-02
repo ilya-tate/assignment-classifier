@@ -1,9 +1,17 @@
+import {filesFor, clearFiles} from './files-db.js';
 const status = document.querySelector('#status');
+// Live per-course sync progress; cleared when a sync starts and finishes.
+const progressList = document.querySelector('#progress');
+const courseProgress = new Map();
+let lastProgressAt = 0;
+function resetProgress() { courseProgress.clear(); progressList.replaceChildren(); lastProgressAt = Date.now(); }
 const list = document.querySelector('#assignments');
 const buttons = [...document.querySelectorAll('button')];
 const MAX_BATCH = 100;
 // Days past due an unsubmitted assignment is still synced into Catch Up. 0 skips all past-due work.
 const OVERDUE_DAYS = 14;
+// Linked-file reading during sync. Off: files are left for the AI step to handle later.
+const READ_FILES = false;
 function card(a, overdue) {
   const card = document.createElement('article');
   if (overdue || (a.startAt && new Date(a.startAt) < new Date())) card.className = 'late';
@@ -14,8 +22,29 @@ function card(a, overdue) {
     ? `${a.estimatedMinutes} min (${a.provider}) · Was due: ${due} · Start now`
     : `${a.estimatedMinutes} min (${a.provider}) · Due: ${due} · Start by: ${a.startAt ? new Date(a.startAt).toLocaleString() : 'Choose a date'}`;
   const reason = document.createElement('small'); reason.textContent = a.reason;
-  card.append(title, details, reason);
+  card.append(title, details);
+  if (a.attachments?.length) {
+    const files = document.createElement('p'); files.className = 'files';
+    files.textContent = `Attachments: ${a.attachments.map(f => f.name).join(', ')}`;
+    card.append(files);
+  }
+  card.append(reason);
+  showSavedFiles(card, a.id);
   return card;
+}
+// Saved documents load asynchronously from IndexedDB; each link downloads the stored copy.
+function fileLink(file) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(file.blob); link.download = file.name; link.textContent = file.name;
+  return link;
+}
+async function showSavedFiles(card, assignmentId) {
+  let saved;
+  try { saved = await filesFor(assignmentId); } catch (error) { console.error('[Saved files]', error); return; }
+  if (!saved.length) return;
+  const line = document.createElement('p'); line.className = 'files'; line.append('Saved: ');
+  saved.forEach((file, i) => line.append(...(i ? [', ', fileLink(file)] : [fileLink(file)])));
+  card.querySelector('small').before(line);
 }
 function section(name, items, overdue) {
   const wrapper = document.createElement('section');
@@ -65,23 +94,41 @@ async function estimate(assignments) {
 document.querySelector('#sync').onclick = () => run(async () => {
   const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
   if (!tab?.id || !/^https:/.test(tab.url || '')) throw new Error('Switch to your signed-in Canvas tab (an https:// page) before syncing.');
-  const result = await step('Reading Canvas', 120000, async () => {
-    const [injection] = await chrome.scripting.executeScript({target:{tabId:tab.id},func:collectCanvasAssignments,args:[{overdueDays:OVERDUE_DAYS}]});
+  resetProgress();
+  // Large file syncs can legitimately take a while, so fail on 2 minutes without progress rather than a short fixed limit.
+  let watchdog;
+  const stalled = new Promise((_, reject) => { watchdog = setInterval(() => {
+    if (Date.now() - lastProgressAt > 120000) reject(new Error('Canvas sync stalled: no progress for 2 minutes. The last line in the list shows where it stopped.'));
+  }, 5000); });
+  const result = await step('Reading Canvas', 1800000, () => Promise.race([stalled, (async () => {
+    const [injection] = await chrome.scripting.executeScript({target:{tabId:tab.id},func:collectCanvasAssignments,args:[{overdueDays:OVERDUE_DAYS,readFiles:READ_FILES}]});
     if (!injection?.result) throw new Error('The Canvas tab returned nothing. Reload the Canvas page and try again.');
     if (!injection.result.ok) throw new Error(injection.result.error);
     return injection.result;
-  });
+  })()])).finally(() => clearInterval(watchdog));
+  // Keep the list after a failure so it shows where sync stopped; clear it on success.
+  resetProgress();
   await estimate(result.assignments);
   console.info('Skipped courses:', result.skipped.endedCourseNames);
-  status.textContent += ` Courses: ${result.courses.join(', ') || 'none'}. Skipped ${result.skipped.endedCourses} ended courses, ${result.skipped.completed} completed, and ${result.skipped.pastDue} more than ${OVERDUE_DAYS} days past due.`;
+  if (result.skipped.files.length) console.info('Skipped attachments:', result.skipped.files);
+  const attached = result.assignments.reduce((n, a) => n + a.attachments.length, 0);
+  const fileSummary = READ_FILES ? ` Read ${attached} attachments, saved ${result.documents.saved} new documents (${result.documents.current} already saved, linked to assignments ${result.documents.links} times), ${result.skipped.files.length} files skipped (see console).` : '';
+  status.textContent += ` Courses: ${result.courses.join(', ') || 'none'}. Skipped ${result.skipped.endedCourses} ended courses, ${result.skipped.completed} completed, and ${result.skipped.pastDue} more than ${OVERDUE_DAYS} days past due.` + fileSummary;
 });
 document.querySelector('#demo').onclick = () => run(() => estimate([
   {id:'demo:1',title:'Research essay',course:'Writing',description:'Write a 1500 word essay with citations.',dueAt:new Date(Date.now()+86400000).toISOString(),points:100,submissionTypes:['online_upload']},
   {id:'demo:2',title:'Weekly quiz',course:'Biology',description:'Review notes and complete ten questions.',dueAt:new Date(Date.now()+172800000).toISOString(),points:10,submissionTypes:['online_quiz']},
   {id:'demo:3',title:'Lab report',course:'Chemistry',description:'Write up the titration lab with data tables.',dueAt:new Date(Date.now()-86400000).toISOString(),points:20,submissionTypes:['online_upload']}
 ]));
-document.querySelector('#clear').onclick = () => run(async () => {await chrome.storage.local.clear();render([]);status.textContent='Local data cleared.';});
-chrome.runtime.onMessage.addListener(message => {
-  if (message?.type === 'CANVAS_PROGRESS' && status.textContent.startsWith('Reading Canvas')) status.textContent = `Reading Canvas… ${message.text}`;
+document.querySelector('#clear').onclick = () => run(async () => {await chrome.storage.local.clear();await clearFiles();render([]);status.textContent='Local data and saved documents cleared.';});
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (sender.id !== chrome.runtime.id) return;
+  if (message?.type !== 'CANVAS_PROGRESS' || !status.textContent.startsWith('Reading Canvas')) return;
+  lastProgressAt = Date.now();
+  if (!message.course) { status.textContent = `Reading Canvas… ${message.text}`; return; }
+  courseProgress.set(message.course, message.text);
+  progressList.replaceChildren(...[...courseProgress].map(([course, text]) => {
+    const line = document.createElement('li'); line.textContent = `${course}: ${text}`; return line;
+  }));
 });
 chrome.storage.local.get('assignments').then(({assignments=[]}) => render(assignments));

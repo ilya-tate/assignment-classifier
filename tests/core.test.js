@@ -14,6 +14,15 @@ test('contract rejects duplicates, invalid dates, excessive payloads and strips 
   assert.throws(()=>validateAssignments(Array(101).fill(assignment)));
   assert.equal(validateAssignments([{...assignment,secret:'unused'}])[0].secret,undefined);
 });
+test('attachments are optional, bounded, and stripped to name and text',()=>{
+  assert.deepEqual(validateAssignments([assignment])[0].attachments,[]);
+  const file={name:'notes.pdf',text:'Read chapter 4',url:'https://drop.me'};
+  assert.deepEqual(validateAssignments([{...assignment,attachments:[file]}])[0].attachments,[{name:'notes.pdf',text:'Read chapter 4'}]);
+  assert.throws(()=>validateAssignments([{...assignment,attachments:Array(6).fill(file)}]));
+  assert.throws(()=>validateAssignments([{...assignment,attachments:[{name:'a',text:'x'.repeat(4001)}]}]));
+  assert.throws(()=>validateAssignments([{...assignment,attachments:[1,2,3].map(n=>({name:`f${n}`,text:'x'.repeat(3000)}))}]));
+  assert.throws(()=>validateAssignments([{...assignment,attachments:[{name:'',text:'x'}]}]));
+});
 test('planner handles null dates and UTC deadline subtraction',()=>{
   assert.equal(plan(assignment,{estimatedMinutes:60,reason:'test'},'mock').startAt,'2026-10-03T22:45:00.000Z');
   assert.equal(plan({...assignment,dueAt:null},{estimatedMinutes:60},'mock').startAt,null);
@@ -44,8 +53,9 @@ test('Snowflake adapter sends server auth and validates model output',async()=>{
     body=JSON.parse(options.body);
     return Response.json({choices:[{message:{content:'{"estimatedMinutes":45,"reason":"Review and answer questions"}'}}]});
   };
-  const result=await estimateAssignment(assignment,{env:snowflake,fetchImpl});
+  const result=await estimateAssignment({...assignment,attachments:[{name:'rubric.txt',text:'Show work'}]},{env:snowflake,fetchImpl});
   assert.equal(result.estimatedMinutes,45);assert.equal(body.stream,false);
+  assert.deepEqual(JSON.parse(body.messages[1].content).attachments,[{name:'rubric.txt',text:'Show work'}]);
   assert.equal(JSON.parse(body.messages[1].content).id,undefined);
   await assert.rejects(estimateAssignment(assignment,{env:snowflake,fetchImpl:async()=>Response.json({choices:[{message:{content:'not JSON'}}]})}));
   await assert.rejects(estimateAssignment(assignment,{env:snowflake,fetchImpl:async()=>new Response('',{status:401})}));
@@ -64,10 +74,10 @@ test('HTTP API handles estimates, validation, origin and provider failures',asyn
   const extensionOrigin=`chrome-extension://${'a'.repeat(32)}`;
   assert.equal((await post({assignments:[]},{Origin:extensionOrigin})).headers.get('Access-Control-Allow-Origin'),extensionOrigin);
 });
-test('assignment view splits Catch Up from Upcoming with the four public fields',async(t)=>{
+test('assignment view splits Catch Up from Upcoming with the public fields',async(t)=>{
   const now=Date.parse('2026-10-03T00:00:00Z');
   const view=summarize([{...assignment,id:'b',dueAt:null},assignment,{...assignment,id:'c',title:'Late',dueAt:'2026-10-01T00:00:00Z'}],now);
-  assert.deepEqual(view.catchUp,[{course:'Biology',title:'Late',description:'Ten questions',dueDate:'2026-10-01T00:00:00Z'}]);
+  assert.deepEqual(view.catchUp,[{course:'Biology',title:'Late',description:'Ten questions',dueDate:'2026-10-01T00:00:00Z',attachments:[]}]);
   assert.deepEqual(view.upcoming.map(a=>a.dueDate),['2026-10-04T00:00:00Z',null]);
   const ordered=summarize([
     {...assignment,id:'u2',dueAt:'2026-10-05T00:00:00Z'},{...assignment,id:'u0',dueAt:null},
