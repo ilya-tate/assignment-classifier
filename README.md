@@ -55,7 +55,8 @@ Reload the extension after changing any setting.
 - **"Cannot reach the local server" / errors on `chrome://extensions`:** the server is not running. Run `npm start` and keep that terminal open. Errors listed on the extensions page persist until you click **Clear all**.
 - **Changes have no effect:** reload the extension on `chrome://extensions`, then refresh the Canvas tab and click the toolbar icon again.
 - **"Click the Can Plan icon while on your Canvas page once" / "Allow access to …":** the extension doesn't know your Canvas address yet, or Chrome's access prompt was declined. Click the icon on a Canvas tab, or enter the address under Advanced options → Canvas, then Sync and allow access when asked.
-- **Finding bottlenecks:** every sync, including failed or stalled ones, writes a report to `sync-logs/sync-<time>.json` (gitignored; the path is shown in the status line). It contains each phase's duration (reading Canvas, server check, estimating), per-course timing (pages of assignments, time to list them, total), the 15 slowest Canvas API requests, server-side estimate timing (count, average and slowest per assignment), and a timestamped timeline of the progress lines. Reports stay on your machine: they include course names, counts, and the progress lines (which name assignments), but no descriptions or credentials. Set `SYNC_LOG_DIR` to write elsewhere.
+- **Finding bottlenecks:** the server prints per-assignment JSON events and writes incremental `sync-logs/inference-<batch UUID>.jsonl` traces, including failed requests. Each sync also saves a combined `sync-logs/sync-<time>.json` report with Canvas request timings and the matching inference job ID. Reports now contain metadata only, without names, descriptions, raw model output or credentials. See [diagnostics and error codes](docs/diagnostics.md). Set `SYNC_LOG_DIR` to write elsewhere locally. Hosted mode uses platform logs and discards sync reports.
+- **Inference takes time:** the popup now shows completed/total assignments and elapsed seconds. Three model calls run concurrently (each estimates 1, 5, or 10 assignments, depending on `INFERENCE_BATCH_SIZE`) through a polled server job, avoiding the old 60-second whole-batch request limit. Keep the popup open; each call has a 45-second timeout and each batch a 10-minute deadline.
 - **Sync seems stuck:** the live progress list shows which course and assignment is being read. Sync fails with a message after 2 minutes without progress, and the list stays visible to show where it stopped.
 - **Old courses still appear:** they are probably on your dashboard (favorited) with no end dates and recent activity. Unfavorite them in Canvas or report the course so detection can be tightened.
 - **"Found N assignments; the server accepts at most 100":** narrow the date range in Advanced options (custom dates, or turn off late assignments) and sync again.
@@ -63,6 +64,10 @@ Reload the extension after changing any setting.
 No install command is needed. `npm test` runs contract/API/provider tests, Canvas collector tests against a mocked Canvas (filtering, attachments, document dedupe), end-to-end collector runs against the mock Canvas server over HTTP, and demo data checks. `npm run eval` runs synthetic effort fixtures and writes ignored `harness/results.json`. Fixture ranges are smoke checks, not measured student completion times or accuracy benchmarks.
 
 If npm is unavailable, use `node --env-file-if-exists=.env server/index.js`, `node --test`, and `node --env-file-if-exists=.env harness/evaluate.js` directly.
+
+## Deploy on DigitalOcean
+
+The server supports a private, single-user App Platform deployment with bearer authentication, explicit extension origins, rate limits, and bounded in-memory retention. Follow [the exact deployment steps](docs/deployment.md). The extension’s **Server settings** page accepts your HTTPS API URL and private access key; Snowflake credentials stay on the server. Localhost remains the default.
 
 ## Enable Snowflake
 
@@ -86,3 +91,11 @@ Copy `.env.example` to `.env` (if you don't have one yet), fill in just `SNOWFLA
 Read [architecture and contracts](docs/architecture.md) before changing interfaces. The model harness includes a versioned prompt, synthetic evaluation cases, mock/live providers, and shared instructions for coding agents. The current planner subtracts estimated active work plus 25% from the deadline; it does not resolve overlapping assignments or account for your schedule. Live Canvas and Snowflake integration must be verified with your own accounts.
 
 For model costs and the proposed ±25% accuracy validation plan, see [model selection](docs/model-selection.md).
+
+## Compare inference batch sizes
+
+Set `INFERENCE_BATCH_SIZE=1`, `5`, or `10` in `.env`, then restart the server. Default is 1. Three groups run concurrently; large inputs split into smaller groups. Progress still counts assignments. Batch responses are matched by local IDs, validated, and missing or invalid items get at most one single-item retry. HTTP/network failures are not retried. Logs include batch size, actual group count, request count, retries and token totals.
+
+Run `npm run eval:batch` for an offline, three-repeat comparison of all modes on 46 synthetic assignments. It writes ignored `harness/batch-results.json`. This simulates request overhead and token counts; it cannot measure real model accuracy, reliability, latency or cost. `INFERENCE_PROVIDER=mock npm run eval` runs the original smoke evaluation without paid calls.
+
+With configured Snowflake credentials, `npm run eval:batch -- --live` explicitly runs the same comparison against Snowflake and **incurs inference costs** (183 initial requests across three repetitions, plus any bounded fallback requests). It sends synthetic fixtures only. Schema failures are retained; systemic auth/network failures stop the comparison. Use `--clean --repeats=1` to compare the ordinary-task cohort once. See [batch behavior and comparison results](docs/batching.md) and [live evaluation findings](docs/live-evaluation.md).

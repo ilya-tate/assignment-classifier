@@ -2,11 +2,12 @@
   "name": "assignment-classifier",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",
     "test": "node --test",
     "eval": "node --env-file-if-exists=.env harness/evaluate.js",
+    "eval:batch": "node --env-file-if-exists=.env harness/compare-batches.js",
     "mock-canvas": "node harness/mock-canvas.js"
   }
 }

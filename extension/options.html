@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Assignment Planner server</title></head>
+<body>
+<h1>Server settings</h1>
+<p>Use your private server access key. Snowflake credentials belong only on the server.</p>
+<form id="settings">
+<p><label>Server URL <input id="url" type="url" required size="60" value="http://localhost:8787"></label></p>
+<p><label>Access key <input id="key" type="password" autocomplete="off" size="60"></label></p>
+<button type="submit">Save</button>
+</form>
+<p id="status" role="status"></p>
+<p id="origin"></p>
+<p>The key is stored locally in this browser profile. Hosted assignment data expires after 15 minutes; browser data remains until Clear data.</p>
+<script type="module" src="options.js"></script>
+</body></html>

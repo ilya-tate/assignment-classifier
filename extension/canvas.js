@@ -10,26 +10,37 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
   const text = html => new DOMParser().parseFromString(html || '', 'text/html').body.textContent.trim();
   // Timing for every Canvas API request, returned in the sync diagnostics (path and page only, no query data).
   const requests = [];
+  const courseStats = [];
   const syncStarted = Date.now();
+  const diagnostics = () => ({totalMs:Date.now()-syncStarted,requestCount:requests.length,courses:courseStats,
+    requests:[...requests],slowestRequests:[...requests].sort((a,b)=>b.ms-a.ms).slice(0,15)});
   async function getJson(url) {
     if (url.origin !== location.origin || !url.pathname.startsWith('/api/v1/')) throw new Error('Invalid Canvas API URL');
-    const timing = {path: url.pathname, page: url.searchParams.get('page') || '1', ms: 0, status: 0, bytes: 0};
+    const timing = {path: url.pathname, bucket:url.searchParams.get('bucket'), page: url.searchParams.get('page') || '1', ms: 0, status: 0, bytes: 0, outcome:'running',headersMs:0,bodyMs:0,parseMs:0};
     const started = Date.now();
     requests.push(timing);
-    let response;
     try {
-      response = await fetch(url, {credentials: 'same-origin', headers: {Accept: 'application/json'}, signal: AbortSignal.timeout(20000)});
-    } catch (error) {
-      timing.ms = Date.now() - started; timing.status = error.name;
-      throw new Error(error.name === 'TimeoutError' ? `Canvas did not respond within 20s (${url.pathname}).` : `Network error contacting Canvas (${url.pathname}).`);
+      const response = await fetch(url, {credentials: 'same-origin', headers: {Accept: 'application/json'}, signal: AbortSignal.timeout(20000)});
+      timing.headersMs=Date.now()-started;timing.status=response.status;
+      if (response.status === 401 || response.status === 403) throw new Error(`Canvas returned ${response.status} for ${url.pathname}; check that you are signed in.`);
+      if (!response.ok) throw new Error(`Canvas returned ${response.status} for ${url.pathname}.`);
+      const bodyStarted=Date.now();
+      const body=(await response.text()).replace(/^while\(1\);/, '');
+      timing.bodyMs=Date.now()-bodyStarted;timing.bytes=new Blob([body]).size;
+      const parseStarted=Date.now();let data;
+      try {data=JSON.parse(body);} catch {throw new Error('This tab is not a Canvas site (API returned non-JSON).');}
+      finally {timing.parseMs=Date.now()-parseStarted;}
+      timing.outcome='complete';return {data,response};
+    } catch(error) {
+      timing.outcome=error.name==='TimeoutError' ? 'timeout' : timing.status ? 'http_or_parse_error' : 'network_error';
+      if(error.name==='TimeoutError') throw new Error(`Canvas did not respond within 20s (${url.pathname}).`);
+      throw error;
+    } finally {
+      timing.ms=Date.now()-started;
+      const safe={...timing,path:timing.path.replace(/\/\d+(?=\/|$)/g,'/:id')};
+      console.info('[Canvas request]',safe);
+      chrome.runtime.sendMessage({type:'CANVAS_DIAGNOSTIC',timing:safe}).catch(()=>{});
     }
-    timing.status = response.status;
-    if (response.status === 401 || response.status === 403) throw new Error(`Canvas returned ${response.status} for ${url.pathname}; check that you are signed in.`);
-    if (!response.ok) throw new Error(`Canvas returned ${response.status} for ${url.pathname}.`);
-    // Canvas can prefix session-authenticated JSON with "while(1);" to block JSON hijacking.
-    const body = (await response.text()).replace(/^while\(1\);/, '');
-    timing.ms = Date.now() - started; timing.bytes = body.length;
-    try { return {data: JSON.parse(body), response}; } catch { throw new Error('This tab is not a Canvas site (API returned non-JSON).'); }
   }
   // onPage(pageNumber, rowsSoFar) lets callers show progress through long paginated lists.
   async function pages(path, onPage = () => {}) {
@@ -186,7 +197,6 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
     const skipped = {completed: 0, pastDue: 0, tooFar: 0, files: [], endedCourses: available.length - courses.length, endedCourseNames: available.filter(c => !courses.includes(c)).map(c => c.name)};
     const kept = [];
     // Per-course timing for the sync report.
-    const courseStats = [];
     // A course whose latest due date is over a semester (~6 months) old is treated as over even if Canvas says otherwise.
     const STALE_MS = 182 * 86400000;
     let done = 0;
@@ -247,8 +257,6 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
       }
     }
     await Promise.all(Array.from({length: Math.min(4, courses.length)}, worker));
-    const diagnostics = {totalMs: Date.now() - syncStarted, requestCount: requests.length, courses: courseStats,
-      slowestRequests: [...requests].sort((a, b) => b.ms - a.ms).slice(0, 15)};
-    return {ok: true, origin: location.origin, assignments, skipped, documents, courses: kept, diagnostics};
-  } catch (error) { return {ok: false, error: error.message}; }
+    return {ok: true, origin: location.origin, assignments, skipped, documents, courses: kept, diagnostics:diagnostics()};
+  } catch (error) { return {ok: false, error: error.message,diagnostics:diagnostics()}; }
 }

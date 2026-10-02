@@ -4,4 +4,7 @@
 node_modules/
 coverage/
 harness/results.json
+harness/batch-results.json
 sync-logs/
+harness/batch-live-*.json
+harness/batch-simulated-*.json

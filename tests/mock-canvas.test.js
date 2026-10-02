@@ -28,7 +28,7 @@ async function scrape(origin, {signedIn = true, options = {overdueDays: 14}} = {
     if (message.type === 'FILE_LINK') return {ok: true, linked: true};
   }}};
   const DOMParser = class { parseFromString(html) { return {body: {textContent: html.replace(/<[^>]+>/g, '')}}; } };
-  const context = vm.createContext({fetch: cookieFetch, chrome, DOMParser, location: new URL(`${origin}/courses`), URL, Response, TextDecoder, AbortSignal, btoa});
+  const context = vm.createContext({fetch: cookieFetch, chrome, DOMParser, location: new URL(`${origin}/courses`), URL, Response, TextDecoder, AbortSignal, Blob, btoa});
   vm.runInContext(collectorSource, context);
   return {result: JSON.parse(JSON.stringify(await context.collectCanvasAssignments(options))), store, requested};
 }
@@ -84,4 +84,8 @@ test('mock Canvas rejects signed-out syncs with the collector\'s sign-in error',
   const {result} = await scrape(await startMock(t), {signedIn: false});
   assert.equal(result.ok, false);
   assert.match(result.error, /401.*signed in/);
+  assert.equal(result.diagnostics.requestCount,1);
+  assert.equal(result.diagnostics.requests[0].status,401);
+  assert.equal(result.diagnostics.requests[0].outcome,'http_or_parse_error');
+  assert.ok(result.diagnostics.requests[0].ms>=0);
 });

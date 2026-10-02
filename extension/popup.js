@@ -5,6 +5,7 @@ import {DAY, DEFAULT_SETTINGS, halfYear, resolveWindow, isVisible, collectorOpti
 // Planner settings (date window, filters, priority, Canvas address, developer mode), remembered in chrome.storage.local.
 let settings = structuredClone(DEFAULT_SETTINGS);
 let syncing = false;
+document.querySelector('#server-settings').onclick = () => chrome.runtime.openOptionsPage();
 const status = document.querySelector('#status');
 // The Canvas tab Sync reads: the tab the toolbar icon was clicked on (passed in the URL or by the service worker).
 let sourceTab = null;
@@ -52,6 +53,8 @@ let lastProgressAt = 0;
 function resetProgress() { courseProgress.clear(); progressList.replaceChildren(); lastProgressAt = Date.now(); }
 // Bottleneck report for the current sync: phase durations and a timestamped progress timeline, saved by the server.
 let phases = [], timeline = [], syncStartedAt = 0, readingCanvas = false;
+let inferenceJobId=null, lastCanvasDiagnostics=null;
+const canvasRequests=[];
 const list = document.querySelector('#assignments');
 const buttons = [...document.querySelectorAll('#sync, #demo, #clear')];
 const MAX_BATCH = 100;
@@ -386,18 +389,35 @@ async function ask(message) {
 }
 async function estimate(assignments) {
   setLoading(0.82, 'Checking server');
-  await step('Checking local server', 6000, () => ask({type:'HEALTH'}));
+  await step('Checking server', 6000, () => ask({type:'HEALTH'}));
   if (!assignments.length) throw new Error('No unsubmitted assignments found in your active Canvas courses.');
   if (assignments.length > MAX_BATCH) throw new Error(`Found ${assignments.length} unsubmitted assignments; the server accepts at most ${MAX_BATCH}. Narrow the date range in Advanced options and sync again.`);
-  setLoading(0.88, 'Estimating');
-  const response = await step(`Estimating ${assignments.length} assignments`, 65000, () => ask({type:'ESTIMATE', assignments}));
+  let response;
+  const phase={phase:`Estimating ${assignments.length} assignments`,ms:0,ok:false};
+  const started=Date.now();phases.push(phase);
+  try {
+    setLoading(0.88, 'Estimating');
+   const job=await ask({type:'INFERENCE_START',assignments});inferenceJobId=job.jobId;
+    console.info('[Inference started]',{jobId:job.jobId,count:assignments.length,logFile:job.logFile});
+    while(true) {
+      response=await ask({type:'INFERENCE_POLL',jobId:job.jobId});
+      status.textContent=`Estimating… ${response.completed}/${response.total} complete (${Math.round(response.elapsedMs/1000)}s).`;
+      if(response.status==='complete') {phase.ok=true;break;}
+      if(response.status!=='running') throw new Error(response.error || 'Inference stopped');
+      if(Date.now()-started>600000) throw new Error('Inference exceeded 10 minutes.');
+      await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+  } catch(error) {
+    if(inferenceJobId) await ask({type:'INFERENCE_CANCEL',jobId:inferenceJobId}).catch(()=>{});
+    throw error;
+  } finally {phase.ms=Date.now()-started;}
   setLoading(1, 'Done');
   await chrome.storage.local.set({assignments: response.assignments});
   render(response.assignments); status.textContent = `${response.assignments.length} assignments up to date.`;
 }
 async function saveSyncReport(result, error) {
   const report = {startedAt: new Date(syncStartedAt).toISOString(), totalMs: Date.now() - syncStartedAt, ok: !error, error: error?.message || null,
-    settings, window: resolveWindow(settings), phases, canvas: result?.diagnostics || null,
+    settings, window: resolveWindow(settings), readFiles: settings.readFiles && settings.devMode, phases, inferenceJobId, canvas: result?.diagnostics || lastCanvasDiagnostics || {requests:canvasRequests,requestCount:canvasRequests.length},
     counts: result ? {assignments: result.assignments.length, courses: result.courses.length, skipped: {...result.skipped, files: result.skipped.files.length}} : null,
     timeline};
   try {
@@ -413,7 +433,7 @@ document.querySelector('#sync').onclick = () => syncing || run(async () => {
   try { await syncOnce(); } finally { syncing = false; showSyncButton(); }
 });
 async function syncOnce() {
-  phases = []; timeline = []; syncStartedAt = Date.now();
+  phases = []; timeline = []; syncStartedAt = Date.now();inferenceJobId=null;lastCanvasDiagnostics=null;canvasRequests.length=0;
   let result, failure;
   try { result = await syncCanvas(); }
   catch (error) { failure = error; }
@@ -480,6 +500,7 @@ async function syncCanvas() {
         [injection] = await runCollector(target.tabId);
       }
       if (!injection?.result) throw new Error('The Canvas tab returned nothing. Reload the Canvas page and try again.');
+      lastCanvasDiagnostics=injection.result.diagnostics || null;
       if (!injection.result.ok) {
         // Signed out: show the tab Sync opened so the user can sign in there.
         if (target.opened && /signed in|401|not a Canvas site/i.test(injection.result.error)) {
@@ -518,6 +539,7 @@ document.querySelector('#demo').onclick = () => run(() => estimate(demoAssignmen
 document.querySelector('#clear').onclick = () => run(async () => {await chrome.storage.local.remove(['assignments', 'lastSync']);await clearFiles();lastSync = null;showSource();showSyncButton();render([]);status.textContent='Local data and saved documents cleared.';});
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (sender.id !== chrome.runtime.id) return;
+  if(message?.type==='CANVAS_DIAGNOSTIC' && readingCanvas) {canvasRequests.push(message.timing);return;}
   if (message?.type === 'ICON_CLICKED') { if (message.source) setSource(message.source); autoSync(); return; }
   if (message?.type !== 'CANVAS_PROGRESS' || !readingCanvas) return;
   lastProgressAt = Date.now();

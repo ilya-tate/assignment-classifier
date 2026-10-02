@@ -1,18 +1,20 @@
 import {saveFile, linkFile, hasCurrentFile} from './files-db.js';
 
-const API = 'http://localhost:8787';
+import {serverSettings} from './server-settings.js';
 const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
 async function callServer(path, options, timeoutMs) {
+  const {url:API, accessKey}=serverSettings((await chrome.storage.local.get('serverSettings')).serverSettings);
+  const headers={...options.headers,...(accessKey ? {Authorization:`Bearer ${accessKey}`} : {})};
   let response;
   try {
-    response = await fetch(`${API}${path}`, {...options, signal: AbortSignal.timeout(timeoutMs)});
+    response = await fetch(`${API}${path}`, {...options, headers, signal: AbortSignal.timeout(timeoutMs)});
   } catch (error) {
-    if (error.name === 'TimeoutError') throw new Error(`Local server did not answer ${path} within ${timeoutMs / 1000}s.`);
-    throw new Error(`Cannot reach the local server at ${API}. Is \`npm start\` running?`);
+    if (error.name === 'TimeoutError') throw new Error(`Server did not answer ${path} within ${timeoutMs / 1000}s.`);
+    throw new Error(`Cannot reach the server at ${API}. Check Server settings and that the server is running.`);
   }
   let data;
-  try { data = await response.json(); } catch { throw new Error(`Local server returned non-JSON (HTTP ${response.status}).`); }
+  try { data = await response.json(); } catch { throw new Error(`Server returned non-JSON (HTTP ${response.status}).`); }
   if (!response.ok) throw new Error(`Server error ${response.status}: ${data.error || 'unknown error'}`);
   return data;
 }
@@ -75,6 +77,13 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (sender.id !== chrome.runtime.id) return;
   let work;
   if (message.type === 'HEALTH') work = callServer('/health', {}, 5000);
+  else if (message.type === 'INFERENCE_START') work = callServer('/api/estimate-jobs', {
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assignments:message.assignments})
+  },10000);
+  else if (['INFERENCE_POLL','INFERENCE_CANCEL'].includes(message.type)) {
+    if(!/^[a-f0-9-]{36}$/.test(message.jobId || '')) {reply({ok:false,error:'Invalid inference job'});return;}
+    work=callServer(`/api/estimate-jobs/${message.jobId}`,{method:message.type==='INFERENCE_CANCEL' ? 'DELETE' : 'GET'},10000);
+  }
   else if (message.type === 'ESTIMATE') work = callServer('/api/estimate', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({assignments: message.assignments})
