@@ -233,7 +233,7 @@ input:disabled { opacity: 0.55; }
 .week-empty { grid-column: 1 / -1; grid-row: 2 / -1; z-index: 1; align-self: center; justify-self: center; margin: 0; padding: 6px 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); text-align: center; pointer-events: none; }
 .week-detail { display: grid; gap: 6px; margin-top: 12px; max-width: 640px; }
 .week-detail:empty { display: none; }
-.week-detail-close { justify-self: end; }
+.week-detail-close { flex-shrink: 0; }
 
 /* Narrow and portrait screens: the week turns sideways, days as rows and bars running down. */
 @media (max-width: 640px) {
