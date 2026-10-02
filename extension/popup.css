@@ -15,18 +15,23 @@
   src: url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
+/* Theme: Cobalt Next (github.com/davidleininger/cobaltnext-vscode, MIT), themes/CobaltNext.json.
+   Always dark regardless of the system setting. Comments name the VS Code color each token comes from. */
 :root {
-  --bg: #f4f6fb; --surface: #ffffff; --border: #dde2ec; --text: #172033; --muted: #5a667d;
-  --accent: #3559d6; --accent-text: #ffffff; --late: #c2412b; --late-bg: #fdf0ed; --behind: #a86a10; --soon-bg: #fdf3e1;
-  --radius: 12px; --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
-  color-scheme: light dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12151c; --surface: #1b2029; --border: #2c3341; --text: #e7eaf0; --muted: #9aa4b6;
-    --accent: #7c97ff; --accent-text: #0e1220; --late: #ff8a73; --late-bg: #2c1c19; --behind: #e7b75f; --soon-bg: #2c2414;
-    --shadow: none;
-  }
+  --bg: #0F1C23;          /* sideBar.background */
+  --surface: #1B2B34;     /* editor.background */
+  --border: #343D46;      /* tab.activeBackground / editorGroup.border */
+  --ui: #4F5B66;          /* editor.selectionBackground */
+  --text: #D8DEE9;        /* descriptionForeground */
+  --muted: color-mix(in srgb, #65737E 45%, #D8DEE9);   /* comment color, lifted for readable small text */
+  --accent: #5FB3B3;      /* button.background / progressBar.background */
+  --accent-text: #0F1C23;
+  --late: #ED6F7D;        /* errorForeground */
+  --late-bg: color-mix(in srgb, #ED6F7D 18%, #1B2B34);
+  --behind: #FAC863;      /* editorWarning.foreground (due soon) */
+  --soon-bg: color-mix(in srgb, #FAC863 16%, #1B2B34);
+  --radius: 12px; --shadow: none;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 /* Hidden elements stay hidden even when a component rule sets display. */
@@ -74,12 +79,11 @@ h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0 0 
 .catch-up h2 { color: var(--late); }
 .catch-up .count { background: var(--late-bg); color: var(--late); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 12px; }
-.card { display: block; padding: 0; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid hsl(var(--course-hue, 225) 65% 55%); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card { display: block; padding: 0; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--course, var(--ui)); border-radius: var(--radius); box-shadow: var(--shadow); }
 .card.late { border-left-color: var(--late); }
 .card { min-width: 0; }
 .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
-.course { min-width: 0; font-size: 12px; font-weight: 600; color: hsl(var(--course-hue, 225) 55% 42%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (prefers-color-scheme: dark) { .course { color: hsl(var(--course-hue, 225) 70% 72%); } }
+.course { min-width: 0; font-size: 12px; font-weight: 600; color: var(--course, var(--ui)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .estimate { flex: none; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
 h3 { font-size: 16px; line-height: 1.3; margin: 0; }
 .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 13px; }
@@ -147,7 +151,7 @@ input[type=date], select { font: inherit; padding: 4px 6px; border: 1px solid va
 input:disabled { opacity: 0.55; }
 .options .hint { flex-basis: auto; }
 .course-filters { display: grid; gap: 6px; }
-.course-filters label { border-left: 3px solid hsl(var(--course-hue, 225) 65% 55%); padding-left: 8px; }
+.course-filters label { border-left: 3px solid var(--course, var(--ui)); padding-left: 8px; }
 .options-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
 
 /* Header and tabs stay reachable while scrolling a long list on tall screens. */
@@ -217,9 +221,9 @@ input:disabled { opacity: 0.55; }
 .day-head.today .day-num { color: var(--accent-text); background: var(--accent); border-radius: 999px; min-width: 28px; text-align: center; }
 .day-col { grid-column: var(--i); grid-row: 1 / -1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .day-col.today { border-color: var(--accent); }
-.bar { grid-column: var(--s) / var(--e); grid-row: var(--lane); z-index: 1; margin: 0 4px; min-width: 0; display: grid; gap: 1px; align-content: start; text-align: left; padding: 6px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, hsl(var(--course-hue, 225) 60% 50%) 45%, var(--border)); border-left: 4px solid hsl(var(--course-hue, 225) 65% 55%); background: color-mix(in srgb, hsl(var(--course-hue, 225) 70% 55%) 14%, var(--surface)); color: var(--text); cursor: pointer; }
+.bar { grid-column: var(--s) / var(--e); grid-row: var(--lane); z-index: 1; margin: 0 4px; min-width: 0; display: grid; gap: 1px; align-content: start; text-align: left; padding: 6px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--course, var(--ui)) 40%, var(--border)); border-left: 4px solid var(--course, var(--ui)); background: color-mix(in srgb, var(--course, var(--ui)) 16%, var(--surface)); color: var(--text); cursor: pointer; }
 .bar:hover, .bar.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
-.bar-course { font-size: 11px; font-weight: 700; color: hsl(var(--course-hue, 225) 55% 42%); }
+.bar-course { font-size: 11px; font-weight: 700; color: var(--course, var(--ui)); }
 .bar-title { font-size: 13px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .bar-late { border-left-color: var(--late); background: color-mix(in srgb, var(--late) 14%, var(--surface)); }
 .bar-soon { border-left-color: var(--behind); background: color-mix(in srgb, var(--behind) 14%, var(--surface)); }
@@ -230,7 +234,6 @@ input:disabled { opacity: 0.55; }
 .week-detail { display: grid; gap: 6px; margin-top: 12px; max-width: 640px; }
 .week-detail:empty { display: none; }
 .week-detail-close { justify-self: end; }
-@media (prefers-color-scheme: dark) { .bar-course { color: hsl(var(--course-hue, 225) 70% 72%); } }
 
 /* Narrow and portrait screens: the week turns sideways, days as rows and bars running down. */
 @media (max-width: 640px) {

@@ -31,7 +31,7 @@ function showSource() {
   const host = known || fromTab, ago = syncedAgo();
   document.querySelector('#source').textContent = host
     ? `Canvas: ${host}${ago ? ` · ${ago}` : ''}`
-    : 'Canvas: click the Can Plan icon while on Canvas to connect, or add your Canvas address in Advanced options.';
+    : 'Canvas: click the CanPlan icon while on Canvas to connect, or add your Canvas address in Advanced options.';
 }
 // First sync happens automatically when the icon is clicked; after that the button offers a resync.
 function showSyncButton() {
@@ -137,7 +137,7 @@ function renderCourseFilters(data) {
     });
     const count = data.filter(a => a.course === course).length;
     label.append(input, ` ${course} `, el('span', 'small-text', `(${count})`));
-    label.style.setProperty('--course-hue', courseHue(course));
+    label.style.setProperty('--course', courseColor(course));
     return label;
   }));
 }
@@ -209,7 +209,10 @@ function effort(minutes) {
   return `${hours} h`;
 }
 // Stable color per course name so the same course looks the same everywhere.
-const courseHue = name => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+// Course colors from Cobalt Next's syntax palette (themes/CobaltNext.json). Its red and yellow are left out
+// because they mark late and due-soon work.
+const COURSE_COLORS = ['#5A9BCF', '#99C794', '#C5A5C5', '#EB9A6D', '#BB80B3', '#AB7967', '#CDD3DE'];
+const courseColor = name => COURSE_COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7) % COURSE_COLORS.length];
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -229,7 +232,7 @@ function card(a, overdue, {daysOnly = false} = {}) {
   card.addEventListener('toggle', () => { card.open ? expanded.add(a.id) : expanded.delete(a.id); });
   if (overdue) card.classList.add('late');
   else if (a.startAt && new Date(a.startAt) < new Date()) card.classList.add('behind');
-  card.style.setProperty('--course-hue', courseHue(a.course));
+  card.style.setProperty('--course', courseColor(a.course));
 
   const summary = el('summary');
   const top = el('div', 'card-top');
@@ -316,7 +319,7 @@ function renderWeek(visible, now) {
     const bar = el('button', `bar${flag ? ` bar-${flag}` : ''}${span.behind ? ' bar-behind' : ''}${continuesBefore ? ' cont-before' : ''}${continuesAfter ? ' cont-after' : ''}${a.id === selectedId ? ' selected' : ''}`);
     bar.type = 'button';
     for (const [name, value] of Object.entries({'--s': startCol + 1, '--e': endCol + 2, '--lane': lane + 2})) bar.style.setProperty(name, String(value));
-    bar.style.setProperty('--course-hue', courseHue(a.course));
+    bar.style.setProperty('--course', courseColor(a.course));
     // Bars show only course and title; late and due-soon work is marked by color. Details open below on click.
     bar.title = `${a.course}: ${a.title}`;
     if (flag) bar.setAttribute('aria-label', `${a.course}: ${a.title} (${flag === 'late' ? 'late' : 'due soon'})`);
@@ -463,13 +466,13 @@ async function canvasTab() {
   const clickedOnCanvas = sourceTab && (!settings.canvasUrl || !sourceTab.url || hostOf(sourceTab.url) === hostOf(settings.canvasUrl));
   if (clickedOnCanvas && await chrome.tabs.get(sourceTab.id).catch(() => null)) return {tabId: sourceTab.id, opened: false, viaClick: true};
   const origin = settings.canvasUrl;
-  if (!origin) throw new Error('Click the Can Plan icon while on your Canvas page once, or add your Canvas address in Advanced options.');
+  if (!origin) throw new Error('Click the CanPlan icon while on your Canvas page once, or add your Canvas address in Advanced options.');
   const pattern = `${origin}/*`;
   let granted = await chrome.permissions.contains({origins: [pattern]});
   if (!granted) {
     try { granted = await chrome.permissions.request({origins: [pattern]}); } catch { granted = false; }
   }
-  if (!granted) throw new Error(`Allow access to ${hostOf(origin)} when Chrome asks, then Sync again. Or click the Can Plan icon while on Canvas.`);
+  if (!granted) throw new Error(`Allow access to ${hostOf(origin)} when Chrome asks, then Sync again. Or click the CanPlan icon while on Canvas.`);
   const [open] = (await chrome.tabs.query({url: pattern})).sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
   if (open) { await tabLoaded(open.id); return {tabId: open.id, opened: false}; }
   setLoading(0.04, 'Opening Canvas');
