@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",
     "test": "node --test",
-    "eval": "node --env-file-if-exists=.env harness/evaluate.js"
+    "eval": "node --env-file-if-exists=.env harness/evaluate.js",
+    "mock-canvas": "node harness/mock-canvas.js"
   }
 }
