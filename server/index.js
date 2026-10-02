@@ -6,7 +6,7 @@ import {inferenceConfig} from './config.js';
 
 // Groups a synced batch the same way the popup does: past-due work is Catch Up, everything else is Upcoming.
 export function summarize(assignments, now=Date.now()) {
-  const view = a => ({course:a.course,title:a.title,description:a.description,dueDate:a.dueAt});
+  const view = a => ({course:a.course,title:a.title,description:a.description,dueDate:a.dueAt,attachments:a.attachments || []});
   const sorted = [...assignments].sort(byDueDate);
   const overdue = a => a.dueAt && Date.parse(a.dueAt) < now;
   return {catchUp:sorted.filter(overdue).map(view),upcoming:sorted.filter(a => !overdue(a)).map(view)};
@@ -36,7 +36,7 @@ export function createServer({env=process.env,estimate=estimateAssignment}={}) {
     let assignments;
     try {
       const chunks=[];let size=0;
-      for await (const chunk of req) {size+=chunk.length;if(size>1500000) {send(413,{error:'Request too large'});return;}chunks.push(chunk);}
+      for await (const chunk of req) {size+=chunk.length;if(size>4000000) {send(413,{error:'Request too large'});return;}chunks.push(chunk);}
       let body;
       try {body=JSON.parse(Buffer.concat(chunks).toString());} catch {return send(400,{error:'Request body is not valid JSON'});}
       assignments=validateAssignments(body?.assignments);

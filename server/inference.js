@@ -15,7 +15,7 @@ export async function estimateAssignment(assignment, {env = process.env, fetchIm
   if (base.protocol !== 'https:' || !base.hostname.endsWith('.snowflakecomputing.com') || base.username || base.password || base.port || base.pathname !== '/' || base.search || base.hash) throw new Error('Invalid Snowflake account URL');
   const response = await fetchImpl(new URL('/api/v2/cortex/v1/chat/completions',base), {
     method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.SNOWFLAKE_TOKEN}`},
-    body:JSON.stringify({model,stream:false,messages:[{role:'system',content:SYSTEM_PROMPT},{role:'user',content:JSON.stringify({title:assignment.title,course:assignment.course,description:assignment.description,points:assignment.points,submissionTypes:assignment.submissionTypes})}]}),
+    body:JSON.stringify({model,stream:false,messages:[{role:'system',content:SYSTEM_PROMPT},{role:'user',content:JSON.stringify({title:assignment.title,course:assignment.course,description:assignment.description,points:assignment.points,submissionTypes:assignment.submissionTypes,attachments:assignment.attachments})}]}),
     signal:AbortSignal.timeout(45000)
   });
   if (!response.ok) throw new Error(`Snowflake inference failed (${response.status})`);
