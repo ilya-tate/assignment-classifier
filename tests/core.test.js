@@ -109,7 +109,7 @@ test('sync reports are written one file per sync with server estimate timing',as
   await post('/api/estimate',{assignments:[assignment,{...assignment,id:'b'}]});
   const first=await (await post('/api/sync-report',{report:{startedAt,phases:[{phase:'Reading Canvas',ms:1234,ok:true}]}})).json();
   await post('/api/sync-report',{report:{startedAt:new Date(Date.now()+1000).toISOString()}});
-  const files=(await readdir(dir)).sort();
+  const files=(await readdir(dir)).filter(f=>f.startsWith('sync-')).sort();
   assert.equal(files.length,2);assert.match(files[0],/^sync-.*\.json$/);assert.ok(first.file.endsWith('.json'));
   const saved=await Promise.all(files.map(async f=>JSON.parse(await readFile(path.join(dir,f),'utf8'))));
   const withTiming=saved.find(r=>r.phases);

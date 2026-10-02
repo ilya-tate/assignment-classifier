@@ -1,4 +1,4 @@
-# Assignment Planner agent harness
+# Can Plan agent harness
 
 ## Goal and boundaries
 Build a user-triggered Canvas assignment collector, server-side Snowflake effort estimator, and deadline planner. Read README.md and docs/architecture.md before changing behavior. This is a hackathon scaffold, not a validated prediction model.

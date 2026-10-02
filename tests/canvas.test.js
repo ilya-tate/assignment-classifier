@@ -41,7 +41,7 @@ async function collect(store = new Map(), options = {readFiles: true}) {
     if (message.type === 'FILE_LINK') { const f = store.get(message.key); if (f && !f.owners.includes(message.owner.assignmentId)) f.owners.push(message.owner.assignmentId); return {ok: true, linked: Boolean(f)}; }
   }}};
   const DOMParser = class { parseFromString(html) { return {body: {textContent: html.replace(/<[^>]+>/g, '')}}; } };
-  const context = vm.createContext({fetch, chrome, DOMParser, location: new URL(origin + '/courses'), URL, Response, TextDecoder, AbortSignal, btoa});
+  const context = vm.createContext({fetch, chrome, DOMParser, location: new URL(origin + '/courses'), URL, Response, TextDecoder, AbortSignal, Blob, btoa});
   vm.runInContext(await readFile(new URL('../extension/canvas.js', import.meta.url), 'utf8'), context);
   // JSON round trip copies sandbox objects into this realm so strict deep equality works.
   return {result: JSON.parse(JSON.stringify(await context.collectCanvasAssignments(options))), store, downloads, requested};
