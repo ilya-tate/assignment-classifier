@@ -1,4 +1,4 @@
-export const DEFAULT_MODEL = 'snowflake-llama-3.3-70b';
+export const DEFAULT_MODEL = 'llama3.1-8b';
 
 export function inferenceConfig(env = process.env) {
   const selection = env.INFERENCE_PROVIDER || 'auto';
