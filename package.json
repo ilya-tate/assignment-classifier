@@ -1,0 +1,11 @@
+{
+  "name": "assignment-classifier",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "test": "node --test",
+    "eval": "node --env-file-if-exists=.env harness/evaluate.js"
+  }
+}
