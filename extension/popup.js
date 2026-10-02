@@ -396,11 +396,12 @@ async function estimate(assignments) {
   const phase={phase:`Estimating ${assignments.length} assignments`,ms:0,ok:false};
   const started=Date.now();phases.push(phase);
   try {
-    setLoading(0.88, 'Estimating');
+    setLoading(0.88, `Estimating 0/${assignments.length}`);
    const job=await ask({type:'INFERENCE_START',assignments});inferenceJobId=job.jobId;
     console.info('[Inference started]',{jobId:job.jobId,count:assignments.length,logFile:job.logFile});
     while(true) {
       response=await ask({type:'INFERENCE_POLL',jobId:job.jobId});
+      setLoading(0.88 + 0.12 * response.completed / Math.max(1, response.total), `Estimating ${response.completed}/${response.total}`);
       status.textContent=`Estimating… ${response.completed}/${response.total} complete (${Math.round(response.elapsedMs/1000)}s).`;
       if(response.status==='complete') {phase.ok=true;break;}
       if(response.status!=='running') throw new Error(response.error || 'Inference stopped');
