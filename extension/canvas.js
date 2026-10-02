@@ -8,27 +8,38 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
   const DONE_STATES = new Set(['submitted', 'graded', 'pending_review']);
   const isCompleted = s => Boolean(s && (DONE_STATES.has(s.workflow_state) || s.submitted_at || s.excused));
   const text = html => new DOMParser().parseFromString(html || '', 'text/html').body.textContent.trim();
+  // Timing for every Canvas API request, returned in the sync diagnostics (path and page only, no query data).
+  const requests = [];
+  const syncStarted = Date.now();
   async function getJson(url) {
     if (url.origin !== location.origin || !url.pathname.startsWith('/api/v1/')) throw new Error('Invalid Canvas API URL');
+    const timing = {path: url.pathname, page: url.searchParams.get('page') || '1', ms: 0, status: 0, bytes: 0};
+    const started = Date.now();
+    requests.push(timing);
     let response;
     try {
       response = await fetch(url, {credentials: 'same-origin', headers: {Accept: 'application/json'}, signal: AbortSignal.timeout(20000)});
     } catch (error) {
+      timing.ms = Date.now() - started; timing.status = error.name;
       throw new Error(error.name === 'TimeoutError' ? `Canvas did not respond within 20s (${url.pathname}).` : `Network error contacting Canvas (${url.pathname}).`);
     }
+    timing.status = response.status;
     if (response.status === 401 || response.status === 403) throw new Error(`Canvas returned ${response.status} for ${url.pathname}; check that you are signed in.`);
     if (!response.ok) throw new Error(`Canvas returned ${response.status} for ${url.pathname}.`);
     // Canvas can prefix session-authenticated JSON with "while(1);" to block JSON hijacking.
     const body = (await response.text()).replace(/^while\(1\);/, '');
+    timing.ms = Date.now() - started; timing.bytes = body.length;
     try { return {data: JSON.parse(body), response}; } catch { throw new Error('This tab is not a Canvas site (API returned non-JSON).'); }
   }
-  async function pages(path) {
+  // onPage(pageNumber, rowsSoFar) lets callers show progress through long paginated lists.
+  async function pages(path, onPage = () => {}) {
     let next = new URL(path, location.origin).href;
     const rows = [];
-    while (next) {
+    for (let page = 1; next; page++) {
       const {data, response} = await getJson(new URL(next));
       if (!Array.isArray(data)) throw new Error('This tab does not expose the Canvas API.');
       rows.push(...data);
+      onPage(page, rows.length);
       const link = response.headers.get('Link') || '';
       const following = link.match(/<([^>]+)>;\s*rel="next"/)?.[1];
       if (following === next) throw new Error('Canvas pagination repeated the same page.');
@@ -153,7 +164,9 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
   // With a course, the text replaces that course's line in the popup's live list; without one, it updates the summary.
   const progress = (text, course) => chrome.runtime.sendMessage({type: 'CANVAS_PROGRESS', text, course}).catch(() => {});
   try {
-    if (location.protocol !== 'https:') throw new Error('Open your HTTPS Canvas site first.');
+    // Plain http is only accepted on loopback, for the mock Canvas server (npm run mock-canvas).
+    const loopback = location.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    if (location.protocol !== 'https:' && !loopback) throw new Error('Open your HTTPS Canvas site first.');
     progress('listing courses');
     // A course is over when Canvas marks it concluded or its own or term end date has passed.
     // Over courses are dropped entirely; courses with no dates at all are treated as ongoing.
@@ -172,6 +185,8 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
     const documents = {saved: 0, current: 0, links: 0};
     const skipped = {completed: 0, pastDue: 0, tooFar: 0, files: [], endedCourses: available.length - courses.length, endedCourseNames: available.filter(c => !courses.includes(c)).map(c => c.name)};
     const kept = [];
+    // Per-course timing for the sync report.
+    const courseStats = [];
     // A course whose latest due date is over a semester (~6 months) old is treated as over even if Canvas says otherwise.
     const STALE_MS = 182 * 86400000;
     let done = 0;
@@ -181,14 +196,34 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
     async function worker() {
       for (let course; (course = queue.shift());) {
         const report = text => progress(text, course.name);
+        const stats = {course: course.name, ms: 0, listMs: 0, pages: 0, assignments: 0, kept: 0, outcome: 'read'};
+        courseStats.push(stats);
+        const courseStarted = Date.now();
         report('loading assignment list');
         let rows;
-        try { rows = await pages(`/api/v1/courses/${course.id}/assignments?per_page=100&include[]=submission`); }
-        catch (error) { throw new Error(`${course.name}: ${error.message}`); }
+        try {
+          // Ask Canvas only for open work, one request per bucket in parallel: future, overdue (past due and not
+          // submitted; skipped when Catch Up is off), and undated. Finished past work is never downloaded; rubrics are
+          // kept. Completed-work filtering below still applies to the returned rows.
+          const buckets = overdueDays > 0 ? ['future', 'overdue', 'undated'] : ['future', 'undated'];
+          const loaded = Object.fromEntries(buckets.map(b => [b, 0]));
+          const lists = await Promise.all(buckets.map(bucket => pages(
+            `/api/v1/courses/${course.id}/assignments?per_page=100&include[]=submission&bucket=${bucket}`,
+            (page, count) => {
+              stats.pages++; loaded[bucket] = count;
+              const total = Object.values(loaded).reduce((n, c) => n + c, 0);
+              report(`loading open assignments (${stats.pages} pages, ${total} assignments, ${Math.round((Date.now() - courseStarted) / 1000)}s)`);
+            })));
+          const byId = new Map(lists.flat().map(a => [a.id, a]));
+          rows = [...byId.values()];
+        } catch (error) { stats.outcome = `failed: ${error.message}`; stats.ms = Date.now() - courseStarted; throw new Error(`${course.name}: ${error.message}`); }
+        stats.listMs = Date.now() - courseStarted; stats.assignments = rows.length;
+        // With bucketed requests this sees only open work, so a course is stale when its newest open deadline is old.
         const lastDue = Math.max(...rows.filter(a => a.due_at).map(a => Date.parse(a.due_at)));
         if (Number.isFinite(lastDue) && lastDue < Date.now() - STALE_MS) {
           skipped.endedCourses++; skipped.endedCourseNames.push(course.name);
           report('skipped: no recent assignments');
+          stats.outcome = 'skipped: no recent assignments'; stats.ms = Date.now() - courseStarted;
           progress(`${++done}/${courses.length} courses read`);
           continue;
         }
@@ -206,11 +241,14 @@ async function collectCanvasAssignments({overdueDays = 0, daysAhead = null, read
             submissionTypes: a.submission_types || [], url: a.html_url,
             attachments: readFiles ? await readAttachments(a.description, skipped.files, {assignmentId: id, course: course.name, assignment: a.name}, documents, report) : []});
         }
-        report(`✓ done (${rows.length} assignments)`);
+        stats.kept = assignments.filter(a => a.course === course.name).length; stats.ms = Date.now() - courseStarted;
+        report(`✓ done (${rows.length} assignments, ${(stats.ms / 1000).toFixed(1)}s)`);
         progress(`${++done}/${courses.length} courses read`);
       }
     }
     await Promise.all(Array.from({length: Math.min(4, courses.length)}, worker));
-    return {ok: true, assignments, skipped, documents, courses: kept};
+    const diagnostics = {totalMs: Date.now() - syncStarted, requestCount: requests.length, courses: courseStats,
+      slowestRequests: [...requests].sort((a, b) => b.ms - a.ms).slice(0, 15)};
+    return {ok: true, assignments, skipped, documents, courses: kept, diagnostics};
   } catch (error) { return {ok: false, error: error.message}; }
 }

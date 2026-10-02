@@ -90,3 +90,11 @@ test('assignment range keeps past-due work within overdueDays and upcoming work 
     assert.deepEqual({pastDue: result.skipped.pastDue, tooFar: result.skipped.tooFar}, {pastDue: 1, tooFar: 1});
   } finally { assignments.splice(0, assignments.length, ...saved); }
 });
+test('sync diagnostics time each course and Canvas request', async () => {
+  const {result} = await collect(new Map(), {});
+  const [english] = result.diagnostics.courses;
+  assert.deepEqual({course: english.course, pages: english.pages, assignments: english.assignments, kept: english.kept, outcome: english.outcome},
+    {course: 'English', pages: 2, assignments: 2, kept: 2, outcome: 'read'}); // one page each for the future and undated buckets
+  assert.ok(result.diagnostics.requestCount >= 3);
+  assert.ok(result.diagnostics.slowestRequests.every(r => r.path.startsWith('/api/v1/') && r.status === 200 && Number.isFinite(r.ms)));
+});
