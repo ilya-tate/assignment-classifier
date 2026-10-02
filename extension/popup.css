@@ -1,3 +1,20 @@
+/* JetBrains Mono, bundled (fonts/, SIL OFL 1.1) so the page works offline without a font CDN. */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("fonts/jetbrains-mono-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
 :root {
   --bg: #f4f6fb; --surface: #ffffff; --border: #dde2ec; --text: #172033; --muted: #5a667d;
   --accent: #3559d6; --accent-text: #ffffff; --late: #c2412b; --late-bg: #fdf0ed; --behind: #a86a10; --soon-bg: #fdf3e1;
@@ -14,7 +31,7 @@
 * { box-sizing: border-box; }
 /* Hidden elements stay hidden even when a component rule sets display. */
 [hidden] { display: none !important; }
-body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); max-width: 1100px; margin: 0 auto; padding: 24px; }
+body { font: 13px/1.5 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); color: var(--text); max-width: 1100px; margin: 0 auto; padding: 24px; }
 a { color: var(--accent); }
 
 /* Header */
@@ -28,7 +45,7 @@ a { color: var(--accent); }
 .sync-area.busy .status-slot { visibility: hidden; }
 .topbar .actions { grid-area: actions; justify-self: end; }
 /* Fixed width: "Sync with Canvas", "Syncing…" and "Resync" must not change the header layout. */
-#sync { width: 172px; }
+#sync { width: 172px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Idle loading bar keeps its space (invisible) instead of collapsing. */
 .loadbar.idle { visibility: hidden; }
 /* Status keeps a fixed two-line slot under the bar; long messages are clamped (full text in the tooltip and dev log). */
@@ -47,7 +64,7 @@ button:disabled { opacity: 0.55; cursor: progress; }
 /* Status and live progress */
 #status { color: var(--muted); }
 #status.error { color: var(--late); font-weight: 600; }
-#progress { margin: 0 0 12px; padding: 8px 12px 8px 30px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+#progress { margin: 0 0 12px; padding: 8px 12px 8px 30px; font-size: 12px; line-height: 1.6; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
 #progress:empty { display: none; }
 
 /* Sections and cards */
@@ -97,7 +114,7 @@ button.small { padding: 4px 10px; font-size: 12px; }
 
 /* Developer toolbar */
 .dev-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; padding: 8px 12px; border: 1px dashed var(--behind); border-radius: 10px; background: var(--surface); }
-.dev-badge { font: 700 11px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.06em; text-transform: uppercase; color: var(--behind); }
+.dev-badge { font-weight: 700; font-size: 11px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; color: var(--behind); }
 .small-text { font-size: 12px; color: var(--muted); }
 
 /* Tabs */

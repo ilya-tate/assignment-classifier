@@ -90,7 +90,7 @@ export function createMockCanvas({now = Date.now, delayMs = 150, slowCourseDelay
     if (url.pathname === '/' || url.pathname === '/login') {
       return send(200, `<!doctype html><meta charset="utf-8"><title>Mock Canvas</title>
 <body style="font:16px system-ui;max-width:640px;margin:40px auto">
-<h1>Mock Canvas (demo)</h1><p>You are signed in as <b>Demo Student</b>. Open the Assignment Planner popup and click <b>Sync Canvas &amp; estimate</b>.</p>
+<h1>Mock Canvas (demo)</h1><p>You are signed in as <b>Demo Student</b>. Click the Can Plan icon in the toolbar; it opens the planner and syncs automatically.</p>
 <p>10 courses: 6 current (Capstone 1 is deliberately slow, with 3 pages of assignments) and 4 the extension should skip.</p>
 <p><a href="/logout">Sign out</a> to test the signed-out error.</p></body>`,
         {'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': `${SESSION}; Path=/; HttpOnly; SameSite=Lax`});

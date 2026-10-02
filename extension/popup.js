@@ -30,13 +30,16 @@ function showSource() {
   const host = known || fromTab, ago = syncedAgo();
   document.querySelector('#source').textContent = host
     ? `Canvas: ${host}${ago ? ` · ${ago}` : ''}`
-    : 'Canvas: click the Assignment Planner icon while on Canvas to connect, or add your Canvas address in Advanced options.';
+    : 'Canvas: click the Can Plan icon while on Canvas to connect, or add your Canvas address in Advanced options.';
 }
 // First sync happens automatically when the icon is clicked; after that the button offers a resync.
 function showSyncButton() {
   const button = document.querySelector('#sync');
-  button.textContent = syncing ? 'Syncing…' : lastSync ? 'Resync' : 'Sync with Canvas';
+  // Phones get the short first-sync label; "Sync with Canvas" doesn't fit their narrower button.
+  button.textContent = syncing ? 'Syncing…' : lastSync ? 'Resync' : narrow.matches ? 'Sync' : 'Sync with Canvas';
 }
+const narrow = matchMedia('(max-width: 640px)');
+narrow.addEventListener('change', () => showSyncButton());
 setInterval(showSource, 60000);
 {
   const params = new URLSearchParams(location.search);
@@ -439,13 +442,13 @@ async function canvasTab() {
   const clickedOnCanvas = sourceTab && (!settings.canvasUrl || !sourceTab.url || hostOf(sourceTab.url) === hostOf(settings.canvasUrl));
   if (clickedOnCanvas && await chrome.tabs.get(sourceTab.id).catch(() => null)) return {tabId: sourceTab.id, opened: false, viaClick: true};
   const origin = settings.canvasUrl;
-  if (!origin) throw new Error('Click the Assignment Planner icon while on your Canvas page once, or add your Canvas address in Advanced options.');
+  if (!origin) throw new Error('Click the Can Plan icon while on your Canvas page once, or add your Canvas address in Advanced options.');
   const pattern = `${origin}/*`;
   let granted = await chrome.permissions.contains({origins: [pattern]});
   if (!granted) {
     try { granted = await chrome.permissions.request({origins: [pattern]}); } catch { granted = false; }
   }
-  if (!granted) throw new Error(`Allow access to ${hostOf(origin)} when Chrome asks, then Sync again. Or click the Assignment Planner icon while on Canvas.`);
+  if (!granted) throw new Error(`Allow access to ${hostOf(origin)} when Chrome asks, then Sync again. Or click the Can Plan icon while on Canvas.`);
   const [open] = (await chrome.tabs.query({url: pattern})).sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
   if (open) { await tabLoaded(open.id); return {tabId: open.id, opened: false}; }
   setLoading(0.04, 'Opening Canvas');
