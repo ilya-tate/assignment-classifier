@@ -294,8 +294,10 @@ function showWeekDetail(a, now) {
   const detail = card(a, Boolean(a.dueAt && Date.parse(a.dueAt) < now), {daysOnly: true});
   detail.open = true;
   const close = el('button', 'quiet small week-detail-close', 'Close');
-  close.type = 'button'; close.onclick = () => { showWeekDetail(null); render(shown); };
-  box.replaceChildren(close, detail);
+  close.type = 'button';
+  close.onclick = event => { event.preventDefault(); showWeekDetail(null); render(shown); };
+  detail.querySelector('.badges').append(close);
+  box.replaceChildren(detail);
 }
 function renderWeek(visible, now) {
   const days = weekDays(now, settings.weekStart, weekOffset), today = dayOf(now);
@@ -390,7 +392,7 @@ async function ask(message) {
   return response;
 }
 async function estimate(assignments) {
-  setLoading(0.82, 'Checking server');
+  setLoading(0.45, 'Checking server');
   await step('Checking server', 6000, () => ask({type:'HEALTH'}));
   if (!assignments.length) throw new Error('No unsubmitted assignments found in your active Canvas courses.');
   if (assignments.length > MAX_BATCH) throw new Error(`Found ${assignments.length} unsubmitted assignments; the server accepts at most ${MAX_BATCH}. Narrow the date range in Advanced options and sync again.`);
@@ -398,12 +400,12 @@ async function estimate(assignments) {
   const phase={phase:`Estimating ${assignments.length} assignments`,ms:0,ok:false};
   const started=Date.now();phases.push(phase);
   try {
-    setLoading(0.88, `Estimating 0/${assignments.length}`);
+    setLoading(0.5, `Estimating 0/${assignments.length}`);
    const job=await ask({type:'INFERENCE_START',assignments});inferenceJobId=job.jobId;
     console.info('[Inference started]',{jobId:job.jobId,count:assignments.length,logFile:job.logFile});
     while(true) {
       response=await ask({type:'INFERENCE_POLL',jobId:job.jobId});
-      setLoading(0.88 + 0.12 * response.completed / Math.max(1, response.total), `Estimating ${response.completed}/${response.total}`);
+      setLoading(0.5 + 0.5 * response.completed / Math.max(1, response.total), `Estimating ${response.completed}/${response.total}`);
       status.textContent=`Estimating… ${response.completed}/${response.total} complete (${Math.round(response.elapsedMs/1000)}s).`;
       if(response.status==='complete') {phase.ok=true;break;}
       if(response.status!=='running') throw new Error(response.error || 'Inference stopped');
@@ -550,7 +552,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (!message.course) {
     devStatus(`Reading Canvas… ${message.text}`);
     const read = message.text.match(/^(\d+)\/(\d+) courses read/), found = message.text.match(/^found (\d+) current courses/);
-    if (read) setLoading(0.1 + 0.7 * Number(read[1]) / Math.max(1, Number(read[2])), 'Reading courses');
+    if (read) setLoading(0.1 + 0.3 * Number(read[1]) / Math.max(1, Number(read[2])), 'Reading courses');
     else if (found) setLoading(0.1, 'Reading courses');
     else setLoading(0.05, 'Reading courses');
     return;
