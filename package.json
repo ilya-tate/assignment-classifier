@@ -1,13 +1,9 @@
 {
-  "name": "assignment-classifier",
+  "name": "canplan",
   "private": true,
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": { "node": ">=24" },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server/index.js",
-    "test": "node --test",
-    "eval": "node --env-file-if-exists=.env harness/evaluate.js",
-    "eval:batch": "node --env-file-if-exists=.env harness/compare-batches.js",
-    "mock-canvas": "node harness/mock-canvas.js"
+    "test": "node --test"
   }
 }
